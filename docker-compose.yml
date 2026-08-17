@@ -1,0 +1,113 @@
+version: '3.8'
+
+# 自托管「任务 + 财务」系统
+# 服务：NPM(反代/HTTPS) · ddns-go(动态DNS) · Vikunja(任务) · ezBookkeeping(财务) · n8n(桥接)
+# 所有密钥/域名走环境变量，详见 .env.example；真实 .env 不入库（见 .gitignore）。
+# 运行时数据全部落在 ./data/ 下（已 gitignore），首次启动见底部 mkdir 命令。
+
+networks:
+  appnet:
+    driver: bridge
+
+services:
+  # ---- 唯一对公网开放 80/443 ----
+  npm:
+    image: jc21/nginx-proxy-manager:latest
+    container_name: npm
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./data/npm/data:/data
+      - ./data/npm/letsencrypt:/etc/letsencrypt
+    restart: unless-stopped
+    networks: [appnet]
+
+  # ---- 动态 DNS（仅内网 :9876 管理）----
+  ddns-go:
+    image: jeessy/ddns-go:latest
+    container_name: ddns-go
+    ports:
+      - "9876:9876"
+    volumes:
+      - ./data/ddns-go:/root/.ddns-go
+    restart: unless-stopped
+    networks: [appnet]
+
+  # ---- 任务管理 Vikunja（不发布主机端口，仅 NPM 内网反代）----
+  vikunja:
+    image: vikunja/vikunja:latest
+    container_name: vikunja
+    volumes:
+      - ./data/vikunja/files:/app/vikunja/files
+      - ./data/vikunja/db:/db
+      - ./data/backup_staging:/backup   # vikunja dump 全量备份落盘目录（备份脚本读取）
+    environment:
+      VIKUNJA_DATABASE_TYPE: sqlite
+      VIKUNJA_DATABASE_PATH: /db/vikunja.db
+      VIKUNJA_SERVICE_TIMEZONE: "Asia/Shanghai"
+      VIKUNJA_SERVICE_ENABLEREGISTRATION: "false"
+      VIKUNJA_SERVICE_EMAIL: "${QQ_EMAIL}@qq.com"
+      VIKUNJA_MAILER_ENABLED: "true"
+      VIKUNJA_MAILER_HOST: "smtp.qq.com"
+      VIKUNJA_MAILER_PORT: "465"
+      VIKUNJA_MAILER_USERNAME: "${QQ_EMAIL}@qq.com"
+      VIKUNJA_MAILER_PASSWORD: "${QQ_AUTH_CODE}"
+      VIKUNJA_MAILER_FROMEMAIL: "${QQ_EMAIL}@qq.com"
+      VIKUNJA_MAILER_ENCRYPTION: "ssl"
+      VIKUNJA_MAILER_SKIPVERIFY: "false"
+    restart: unless-stopped
+    networks: [appnet]
+
+  # ---- 财务管理 ezBookkeeping（不发布主机端口）----
+  ezbookkeeping:
+    image: mayswind/ezbookkeeping:latest
+    container_name: ezbookkeeping
+    user: "1000:1000"
+    volumes:
+      - ./data/ezbookkeeping/data:/ezbookkeeping/data
+      - ./data/ezbookkeeping/storage:/ezbookkeeping/storage
+    environment:
+      TZ: Asia/Shanghai
+      # 必改：随机密钥，群晖 SSH 执行 `openssl rand -base64 32`
+      EBK_SECURITY_SECRET_KEY: "${EZB_SECRET_KEY}"
+      # 开启 API Token（n8n 桥接必需）
+      EBK_SECURITY_ENABLE_API_TOKEN: "true"
+      EBK_MAIL_SMTP_HOST: "smtp.qq.com"
+      EBK_MAIL_SMTP_PORT: "465"
+      EBK_MAIL_SMTP_PROTOCOL: "smtps"
+      EBK_MAIL_SMTP_USER: "${QQ_EMAIL}@qq.com"
+      EBK_MAIL_SMTP_PASSWD: "${QQ_AUTH_CODE}"
+      EBK_MAIL_FROM_ADDRESS: "${QQ_EMAIL}@qq.com"
+      EBK_MAIL_FROM_NAME: "任务财务系统"
+      # 访问地址（影响邮件内链接/头像/图片）
+      EBK_SERVER_DOMAIN: "fin.${DOMAIN}"
+      EBK_SERVER_ROOT_URL: "https://fin.${DOMAIN}"
+      EBK_SERVER_ENABLE_GZIP: "true"
+      # 数据导出开关（备份工作流 GET /api/data/export.csv 依赖此开关）
+      EBK_DATA_ENABLE_EXPORT: "true"
+    restart: unless-stopped
+    networks: [appnet]
+
+  # ---- 自动化桥接 n8n（不发布主机端口）----
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    volumes:
+      - ./data/n8n:/home/node/.n8n
+    environment:
+      TZ: "Asia/Shanghai"
+      GENERIC_TIMEZONE: "Asia/Shanghai"
+      # n8n 1.x 用内置 Owner 账号（首次登录设密码），不再用 N8N_BASIC_AUTH
+      WEBHOOK_URL: "https://flow.${DOMAIN}/"
+    restart: unless-stopped
+    networks: [appnet]
+
+# ===== 首次启动（在仓库根目录执行）=====
+# cp .env.example .env   # 然后填好真实值
+# mkdir -p data/npm/data data/npm/letsencrypt data/ddns-go \
+#          data/vikunja/files data/vikunja/db \
+#          data/ezbookkeeping/data data/ezbookkeeping/storage \
+#          data/n8n data/backup_staging
+# chown -R 1000:1000 data/ezbookkeeping/data data/ezbookkeeping/storage
+# docker compose up -d

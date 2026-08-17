@@ -1,0 +1,70 @@
+{
+  "name": "Vikunja Budget Plan → ezBookkeeping",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "vikunja-plan",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "c1",
+      "name": "Vikunja Webhook (created)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 300],
+      "webhookId": "vikunja-plan"
+    },
+    {
+      "parameters": {
+        "functionCode": "// 任务新建时，把 fund: 金额登记为 ezB 计划支出（预算项）\nconst e = $input.item.json;\nconst task = (e.data && e.data.task) ? e.data.task : {};\nconst labels = (task.labels || []).map(l => (l.title || l).toString());\nconst m = labels.find(x => x.startsWith('fund:'));\nif (!m) return []; // 没有资金标签则不建账\nconst parts = m.slice(5).split(':');\nconst amount = parseFloat(parts[0]);\nconst currency = parts[1] || 'CNY';\nreturn [{\n  json: {\n    taskId: task.id,\n    title: task.title,\n    fund_amount: amount,\n    fund_currency: currency\n  }\n}];"
+      },
+      "id": "c2",
+      "name": "Parse Fund Label",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://ezbookkeeping:8080/api/v1/transactions/add.json",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $vars.ezb_token }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Timezone-Name", "value": "Asia/Shanghai" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "type", "value": 3 },
+            { "name": "categoryId", "value": "={{ $vars.ezb_cat_expense }}" },
+            { "name": "time", "value": "={{ Math.floor(Date.now() / 1000) }}" },
+            { "name": "utcOffset", "value": 480 },
+            { "name": "sourceAccountId", "value": "={{ $vars.ezb_account_id }}" },
+            { "name": "sourceAmount", "value": "={{ Math.round($json.fund_amount * 100) }}" },
+            { "name": "comment", "value": "=预算登记(计划支出): {{ $json.title }} #vk-{{ $json.taskId }}" }
+          ]
+        }
+      },
+      "id": "c3",
+      "name": "ezB Plan Expense",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [710, 300]
+    }
+  ],
+  "connections": {
+    "Vikunja Webhook (created)": { "main": [ [ { "node": "Parse Fund Label", "type": "main", "index": 0 } ] ] },
+    "Parse Fund Label": { "main": [ [ { "node": "ezB Plan Expense", "type": "main", "index": 0 } ] ] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false,
+  "versionId": "1",
+  "meta": { "instanceId": "local" },
+  "id": "vikunja-budget-plan"
+}

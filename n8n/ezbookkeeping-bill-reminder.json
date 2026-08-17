@@ -1,0 +1,70 @@
+{
+  "name": "ezBookkeeping Bill Reminder",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [ { "field": "cronExpression", "expression": "0 9 * * *" } ] }
+      },
+      "id": "d1",
+      "name": "Daily 09:00",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "notice": "模板工作流：ezBookkeeping 周期/计划交易可通过其「预定交易(Scheduled Transaction)」或自定义查询接口获取。下方 HTTP Request 拉取近期交易，Function 节点筛出临期项，再用「发送邮件」节点经 QQ SMTP 提醒。请按实际接口补全 URL 与筛选逻辑，并配置 n8n Email 节点的 QQ SMTP 凭据。",
+        "notesInFlow": true
+      },
+      "id": "d2",
+      "name": "说明(Sticky)",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [250, 120],
+      "width": 420,
+      "height": 160
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://ezbookkeeping:8080/api/v1/transactions/list.json",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $vars.ezb_token }}" },
+            { "name": "X-Timezone-Name", "value": "Asia/Shanghai" }
+          ]
+        },
+        "qsParameters": {
+          "parameters": [
+            { "name": "count", "value": 50 }
+          ]
+        }
+      },
+      "id": "d3",
+      "name": "ezB List (recent)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// 示例：筛出评论含「待付/账单」且金额>0 的交易，作为临期提醒候选\nconst items = $input.item.json.result || $input.item.json || {};\nconst txs = Array.isArray(items) ? items : (items.transactions || []);\nconst now = Date.now();\nconst out = [];\nfor (const tx of txs) {\n  const c = (tx.comment || '').toString();\n  if (/(待付|账单|缴费|续费)/.test(c)) {\n    out.push({ json: { txId: tx.id, comment: c, amount: tx.sourceAmount } });\n  }\n}\nreturn out;"
+      },
+      "id": "d4",
+      "name": "Filter Due Bills",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [710, 300]
+    }
+  ],
+  "connections": {
+    "Daily 09:00": { "main": [ [ { "node": "ezB List (recent)", "type": "main", "index": 0 } ] ] },
+    "ezB List (recent)": { "main": [ [ { "node": "Filter Due Bills", "type": "main", "index": 0 } ] ] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false,
+  "versionId": "1",
+  "meta": { "instanceId": "local" },
+  "id": "ezbookkeeping-bill-reminder"
+}

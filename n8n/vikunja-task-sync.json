@@ -1,0 +1,119 @@
+{
+  "name": "Vikunja Task Sync → ezBookkeeping",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "vikunja-task",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "a1",
+      "name": "Vikunja Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 300],
+      "webhookId": "vikunja-task"
+    },
+    {
+      "parameters": {
+        "functionCode": "// 解析 Vikunja webhook 载荷，提取标签中的 fund:/res:/deliv:/milestone\nconst e = $input.item.json;\nconst evt = e.event_name;\nconst task = (e.data && e.data.task) ? e.data.task : {};\nconst labels = (task.labels || []).map(l => (l.title || l).toString());\nfunction parseLabel(prefix){\n  const m = labels.find(x => x.startsWith(prefix + ':'));\n  return m ? m.slice(prefix.length + 1) : null;\n}\nconst fund = parseLabel('fund'); // 形如 5000:CNY\nlet amount = null, currency = 'CNY';\nif (fund) {\n  const parts = fund.split(':');\n  amount = parseFloat(parts[0]);\n  if (parts[1]) currency = parts[1];\n}\nreturn [{\n  json: {\n    event_name: evt,\n    taskId: task.id,\n    projectId: task.project_id,\n    title: task.title,\n    done: !!task.done,\n    labels: labels,\n    fund_amount: amount,\n    fund_currency: currency,\n    res: parseLabel('res'),\n    deliv: parseLabel('deliv'),\n    is_milestone: labels.includes('milestone')\n  }\n}];"
+      },
+      "id": "a2",
+      "name": "Parse Labels",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true },
+          "combinator": "and",
+          "conditions": [
+            { "leftValue": "={{ $json.event_name }}", "rightValue": "task.updated", "operator": { "type": "string", "operation": "equals" } },
+            { "leftValue": "={{ $json.done }}", "rightValue": true, "operator": { "type": "boolean", "operation": "equals" } }
+          ]
+        }
+      },
+      "id": "a3",
+      "name": "Is Completed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [710, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://ezbookkeeping:8080/api/v1/transactions/add.json",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $vars.ezb_token }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Timezone-Name", "value": "Asia/Shanghai" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "type", "value": 3 },
+            { "name": "categoryId", "value": "={{ $vars.ezb_cat_expense }}" },
+            { "name": "time", "value": "={{ Math.floor(Date.now() / 1000) }}" },
+            { "name": "utcOffset", "value": 480 },
+            { "name": "sourceAccountId", "value": "={{ $vars.ezb_account_id }}" },
+            { "name": "sourceAmount", "value": "={{ Math.round($json.fund_amount * 100) }}" },
+            { "name": "comment", "value": "=任务完成记账: {{ $json.title }} #vk-{{ $json.taskId }}" }
+          ]
+        }
+      },
+      "id": "a4",
+      "name": "ezB Create Expense",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [950, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://vikunja:3456/api/v1/tasks/{{ $json.taskId }}/comments",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $vars.vikunja_token }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "comment", "value": "=已自动记账到 ezBookkeeping：支出 ¥{{ $json.fund_amount }}（交易评论含 #vk-{{ $json.taskId }}）" }
+          ]
+        }
+      },
+      "id": "a5",
+      "name": "Vikunja Comment Back",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1180, 200]
+    }
+  ],
+  "connections": {
+    "Vikunja Webhook": { "main": [ [ { "node": "Parse Labels", "type": "main", "index": 0 } ] ] },
+    "Parse Labels": { "main": [ [ { "node": "Is Completed?", "type": "main", "index": 0 } ] ] },
+    "Is Completed?": {
+      "main": [
+        [ { "node": "ezB Create Expense", "type": "main", "index": 0 } ],
+        []
+      ]
+    },
+    "ezB Create Expense": { "main": [ [ { "node": "Vikunja Comment Back", "type": "main", "index": 0 } ] ] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false,
+  "versionId": "1",
+  "meta": { "instanceId": "local" },
+  "id": "vikunja-task-sync"
+}

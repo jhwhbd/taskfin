@@ -1,0 +1,83 @@
+{
+  "name": "ezBookkeeping Poll → Vikunja Comment",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [ { "field": "minutes", "minutesInterval": 5 } ] }
+      },
+      "id": "b1",
+      "name": "Every 5 min",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://ezbookkeeping:8080/api/v1/transactions/list.json",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $vars.ezb_token }}" },
+            { "name": "X-Timezone-Name", "value": "Asia/Shanghai" }
+          ]
+        },
+        "qsParameters": {
+          "parameters": [
+            { "name": "count", "value": 20 }
+          ]
+        }
+      },
+      "id": "b2",
+      "name": "ezB List Transactions",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// 过滤出评论里含 #vk-<任务ID> 且本工作流尚未处理过的交易\nconst sd = $workflow.staticData;\nif (!sd.lastIds) sd.lastIds = [];\nconst items = $input.item.json.result || $input.item.json || {};\nconst txs = Array.isArray(items) ? items : (items.transactions || []);\nconst out = [];\nfor (const tx of txs) {\n  const comment = (tx.comment || '').toString();\n  const m = comment.match(/#vk-(\\d+)/);\n  if (m && !sd.lastIds.includes(tx.id)) {\n    out.push({ json: { txId: tx.id, taskId: parseInt(m[1], 10), comment: comment, amount: tx.sourceAmount, type: tx.type } });\n  }\n  if (!sd.lastIds.includes(tx.id)) sd.lastIds.push(tx.id);\n}\n// 仅保留最近 200 条去重记录\nsd.lastIds = sd.lastIds.slice(-200);\nreturn out;"
+      },
+      "id": "b3",
+      "name": "Filter #vk Transactions",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [710, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://vikunja:3456/api/v1/tasks/{{ $json.taskId }}/comments",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $vars.vikunja_token }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "comment", "value": "=财务侧记录已更新：{{ $json.comment }}（交易ID {{ $json.txId }}）" }
+          ]
+        }
+      },
+      "id": "b4",
+      "name": "Vikunja Comment Back",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [950, 300]
+    }
+  ],
+  "connections": {
+    "Every 5 min": { "main": [ [ { "node": "ezB List Transactions", "type": "main", "index": 0 } ] ] },
+    "ezB List Transactions": { "main": [ [ { "node": "Filter #vk Transactions", "type": "main", "index": 0 } ] ] },
+    "Filter #vk Transactions": { "main": [ [ { "node": "Vikunja Comment Back", "type": "main", "index": 0 } ] ] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false,
+  "versionId": "1",
+  "meta": { "instanceId": "local" },
+  "id": "ezbookkeeping-poll"
+}
