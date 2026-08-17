@@ -41,6 +41,9 @@ taskfin/
 │   ├── ezbookkeeping-bill-reminder.json# 账单临期提醒模板（默认禁用，排除贷款）
 │   ├── backup-csv-7z-email.json        # 弃用占位，勿用
 │   └── Dockerfile                      # 备用（当前 compose 用官方镜像）
+├── vendor/                 # 上游源码保险副本（详见 vendor/SOURCES.md）
+│   ├── vikunja/            # AGPL-3.0（go-vikunja/vikunja 快照，未修改）
+│   └── ezbookkeeping/      # MIT（mayswind/ezbookkeeping 快照，未修改）
 └── docs/                   # 完整方案文档（设计阶段 v2.7）
     ├── 00-交接总览.md
     ├── 01-需求与决策记录.md
@@ -85,6 +88,17 @@ docker compose up -d
 2. **n8n 四个 JSON 未实机校验**：`fund:` 标签解析、金额×100、`typeVersion`、Webhook 路径需在真机联调。
 3. **`/share/backup` 真实路径**：群晖共享多挂在 `/volume1/share/backup`，`scripts/backup.sh` 里的 `SMB_DIR` 需按真实路径改。
 
+## 第三方源码与许可证
+
+本项目在 `vendor/` 下收录了所依赖的上游开源项目**完整源码快照**（保险副本，非日常运行依赖），以便在官方仓库/镜像不可用时仍可自包含构建。详细说明与更新方法见 [`vendor/SOURCES.md`](vendor/SOURCES.md)：
+
+| 项目 | 上游 | 许可证 | 在本项目中的角色 |
+|---|---|---|---|
+| Vikunja | go-vikunja/vikunja | **AGPL-3.0** | 任务管理（日常用官方镜像；源码为保险副本） |
+| ezBookkeeping | mayswind/ezbookkeeping | **MIT** | 财务管理（同上） |
+
+> ⚠️ **AGPL-3.0 义务提示**：Vikunja 是强 copyleft 许可证。若你**修改其源码**并**通过网络交互方式向他人提供该服务**（例如自托管并允许家庭成员/其他用户访问），须按 AGPL 第 13 条向这些用户提供修改后的对应源码。本项目当前为未修改快照，纯自用一般不触发该义务。
+
 ## License
 
-[MIT](LICENSE)
+本项目自身代码以 [MIT](LICENSE) 授权；`vendor/` 内各项目的许可证以其自带的 `LICENSE` 文件为准（Vikunja: AGPL-3.0 / ezBookkeeping: MIT）。
