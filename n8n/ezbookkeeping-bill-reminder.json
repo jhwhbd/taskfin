@@ -49,7 +49,7 @@
     },
     {
       "parameters": {
-        "functionCode": "// 示例：筛出评论含「待付/账单」且金额>0 的交易，作为临期提醒候选\nconst items = $input.item.json.result || $input.item.json || {};\nconst txs = Array.isArray(items) ? items : (items.transactions || []);\nconst now = Date.now();\nconst out = [];\nfor (const tx of txs) {\n  const c = (tx.comment || '').toString();\n  if (/(待付|账单|缴费|续费)/.test(c)) {\n    out.push({ json: { txId: tx.id, comment: c, amount: tx.sourceAmount } });\n  }\n}\nreturn out;"
+        "functionCode": "// 筛出临期账单提醒候选；显式排除「贷款还款」分类（贷款不提醒，仅跟踪）\nconst loanCat = $vars.ezb_cat_loan;\nconst items = $input.item.json.result || $input.item.json || {};\nconst txs = Array.isArray(items) ? items : (items.transactions || []);\nconst out = [];\nfor (const tx of txs) {\n  // 显式按分类排除贷款：ezB 交易携带 categoryId（嵌套 category.id 兜底）；贷款交易不进提醒\n  const catId = (tx.categoryId !== undefined) ? tx.categoryId : (tx.category && (tx.category.id !== undefined ? tx.category.id : undefined));\n  if (loanCat && String(catId) === String(loanCat)) continue;\n  const c = (tx.comment || '').toString();\n  if (/(待付|账单|缴费|续费)/.test(c)) {\n    out.push({ json: { txId: tx.id, comment: c, amount: tx.sourceAmount, categoryId: catId } });\n  }\n}\nreturn out;"
       },
       "id": "d4",
       "name": "Filter Due Bills",
