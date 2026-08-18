@@ -1,5 +1,23 @@
 # 任务 + 财务 自托管系统（taskfin）
 
+## 🌐 English Summary
+
+**taskfin** is a self-hosted, all-local stack for **task management + personal finance + automation**, designed to run on a Synology NAS (or any Docker host). Your data never leaves your network and depends on no third-party cloud.
+
+**Components**
+- **Vikunja** — task management (categories → projects → tasks, due/overdue email reminders, mobile PWA + CalDAV).
+- **ezBookkeeping** — personal finance (income/expense/balance, reports, recurring transactions, official mobile app).
+- **n8n** — automation bridge syncing tasks ↔ finance (create task → log budget; complete task → record actual spend; finance charge → write back to task).
+- **Nginx Proxy Manager** + **ddns-go** — HTTPS reverse proxy and dynamic DNS (Namecheap).
+
+**Architecture** — All three apps run inside the internal Docker network and talk to each other without leaving the LAN. Only ports **80/443** are exposed to the public internet (via NPM). Data is stored in **SQLite**; an automated `backup.sh` performs full backups with high compression and keeps only the 3 latest copies.
+
+**Deploy** — `docker compose up -d` driven by environment variables (copy `.env.example` → `.env`). See [`docs/03-实施部署手册.md`](docs/03-实施部署手册.md) for the full step-by-step guide (Chinese). Upstream source snapshots are vendored under `vendor/` (Vikunja: AGPL-3.0, ezBookkeeping: MIT) as a safety copy.
+
+> ⚠️ This repo is **design-complete but not yet deployed to real hardware**; the n8n workflows and some parameters need live testing.
+
+---
+
 在群晖（或任意 Docker 主机）上自托管一套 **任务管理 + 财务管理 + 自动化桥接** 系统，数据完全自己掌握、不依赖任何第三方云服务。
 
 - **任务管理** — [Vikunja](https://vikunja.io/)：类别 → 项目 → 任务三层结构，起止时间、里程碑、到期/临期邮件提醒、移动端 PWA + CalDAV。
