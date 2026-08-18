@@ -57,8 +57,8 @@ services:
       VIKUNJA_MAILER_USERNAME: "${QQ_EMAIL}@qq.com"
       VIKUNJA_MAILER_PASSWORD: "${QQ_AUTH_CODE}"
       VIKUNJA_MAILER_FROMEMAIL: "${QQ_EMAIL}@qq.com"
-      VIKUNJA_MAILER_ENCRYPTION: "ssl"
-      VIKUNJA_MAILER_SKIPVERIFY: "false"
+      VIKUNJA_MAILER_FORCESSL: "true"
+      VIKUNJA_MAILER_SKIPTLSVERIFY: "false"
     restart: unless-stopped
     networks: [appnet]
 
@@ -76,6 +76,8 @@ services:
       EBK_SECURITY_SECRET_KEY: "${EZB_SECRET_KEY}"
       # 开启 API Token（n8n 桥接必需）
       EBK_SECURITY_ENABLE_API_TOKEN: "true"
+      # 关闭公开注册（ezB 默认 enable_register=true，不关则他人可自建账号）
+      EBK_SECURITY_ENABLE_REGISTER: "false"
       EBK_MAIL_SMTP_HOST: "smtp.qq.com"
       EBK_MAIL_SMTP_PORT: "465"
       EBK_MAIL_SMTP_PROTOCOL: "smtps"

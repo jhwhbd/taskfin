@@ -16,10 +16,11 @@ set -euo pipefail
 # ---------- 可配置区（按你环境修改） ----------
 PROJECT_DIR="/volume1/docker/taskfin"          # compose 项目目录
 STAGING="$PROJECT_DIR/data/backup_staging"     # 临时落盘目录（已挂进 vikunja 容器 /backup；注意：与 compose 卷 ./data/backup_staging 对应，含 data/ 前缀）
-# 备份写入目标：本机群晖共享文件夹 /share/backup（Windows 侧 \\<群晖内网IP>\share\backup）
-# 说明：DSM 的共享文件夹实际挂载路径通常为 /volume1/share/backup；若你的 share 名不是 share，
-#       或共享挂在别的 volume（如 /volume2），请把下面路径改成真实绝对路径。
-SMB_DIR="/share/backup"
+# 备份写入目标：本机群晖共享文件夹的真实绝对路径。
+# 群晖共享文件夹在文件系统内的真实路径为 /volume1/<共享名>/<子目录>，
+# 请先在 DSM「控制面板 -> 共享文件夹」建好子目录（如 share/taskfin_backup），再把下面改成真实路径。
+# 注意：不要用旧版 DSM 的 /share/<名> 软链接别名，新版可能不存在，会静默写错位置。
+SMB_DIR="/volume1/share/taskfin_backup"
 # 若要备份到别的机器的 Windows 共享：先群晖「文件服务 -> 挂载 CIFS」挂好，
 # 再把下面这行改成挂载点路径，例如 /volume1/@mount/CIFS/remote_backup
 # SMB_DIR="/volume1/@mount/CIFS/remote_backup"
@@ -33,7 +34,13 @@ LOG_FILE="$STAGING/backup.log"
 TS="$(date +%Y%m%d-%H%M%S)"
 # ------------------------------------------------------------
 
-mkdir -p "$STAGING" "$SMB_DIR"
+# 目标共享目录必须预先存在（不自动创建，避免静默写错位置导致备份丢失）
+if [ ! -d "$SMB_DIR" ]; then
+  echo "错误：备份目标目录不存在：$SMB_DIR" >&2
+  echo "请先在 DSM 建好该共享子目录，或修改脚本顶部 SMB_DIR 为真实路径。" >&2
+  exit 1
+fi
+mkdir -p "$STAGING"
 exec > >(tee -a "$LOG_FILE") 2>&1
 echo "===== 备份开始 $TS ====="
 

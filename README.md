@@ -33,7 +33,9 @@ taskfin/
 ├── README.md
 ├── LICENSE
 ├── scripts/
-│   └── backup.sh           # 群晖任务计划用：全量备份 + 高压缩 + 仅留 3 份
+│   ├── backup.sh           # 群晖任务计划用：全量备份 + 高压缩 + 仅留 3 份
+│   ├── init.sh             # 部署后初始化：Vikunja 建首管理员（幂等可重跑）
+│   └── check-vendor.sh     # 比对 vendor/ 上游源码哈希与 GitHub 最新提交
 ├── n8n/                    # n8n 工作流导出（在 n8n 里 Import 即可）
 │   ├── vikunja-task-sync.json          # 任务完成 → 记实际支出 → 回写
 │   ├── vikunja-budget-plan.json        # 任务新建 → 登计划支出（预算）
@@ -85,11 +87,11 @@ docker compose up -d
 
 1. **CalDAV 手机闹钟**：Vikunja 的 CalDAV 可能只同步事件、不导出 VALARM，手机可能不弹闹钟；可靠提醒仍是 QQ 邮件兜底。
 2. **n8n 四个 JSON 未实机校验**：`fund:` 标签解析、金额×100、`typeVersion`、Webhook 路径需在真机联调。
-3. **`/share/backup` 真实路径**：群晖共享多挂在 `/volume1/share/backup`，`scripts/backup.sh` 里的 `SMB_DIR` 需按真实路径改。
+3. **确认备份共享子目录真实存在**：`scripts/backup.sh` 的 `SMB_DIR` 已锚定 `/volume1/share/taskfin_backup`，部署前请在 DSM「控制面板 → 共享文件夹」确认该子目录真实存在（否则脚本会因目录不存在而报错退出）。
 
 ## 镜像版本锁定
 
-`docker-compose.yml` 中所有镜像均使用**具体版本号**（非 `latest`），以保证每次启动拉到的镜像一致、出问题时可定位。版本在文件顶部以变量集中声明：
+`docker-compose.yml` 中所有镜像均使用**具体版本号**（非 `latest`），以保证每次启动拉到的镜像一致、出问题时可定位。版本在 `.env.example` 中以变量集中声明，compose 通过 `${XXX_VERSION}` 引用（复制 `.env.example` 为 `.env` 后生效）：
 
 | 服务 | 镜像 | 当前锁定版本 |
 |---|---|---|
