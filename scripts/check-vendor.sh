@@ -29,9 +29,9 @@ for entry in "${REPOS[@]}"; do
     echo ""
     continue
   fi
-  # 从 SOURCES.md 取记录的哈希（取 12 位）
+  # 从 SOURCES.md 取记录的哈希（取 12 位）。标题大小写不定，统一转小写匹配。
   recorded=$(awk -v name="$name" '
-    $0 ~ "^### " name {found=1; next}
+    tolower($0) ~ ("^### " tolower(name)) {found=1; next}
     found && /^### / {found=0}
     found && /Vendor 版本/ {
       match($0, /[0-9a-f]{12,}/); print substr($0, RSTART, 12); exit

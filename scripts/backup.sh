@@ -29,7 +29,7 @@ EXPORT_CSV=1
 EZB_TOKEN=""                                   # 填你的 ezB API Token（在 n8n 变量 ezb_token 同值）
 # Vikunja dump 不需要 Token（走容器内部命令）
 
-LOG_FILE="$PROJECT_DIR/backup_staging/backup.log"
+LOG_FILE="$STAGING/backup.log"
 TS="$(date +%Y%m%d-%H%M%S)"
 # ------------------------------------------------------------
 
@@ -39,7 +39,7 @@ echo "===== 备份开始 $TS ====="
 
 # 1) Vikunja 全量 dump -> 容器内 /backup -> 宿主机 STAGING
 echo "[1/4] Vikunja dump ..."
-docker exec vikunja sh -c "cd /backup && /app/vikunja/vikunja dump" \
+docker exec vikunja sh -c "/app/vikunja/vikunja dump --path /backup" \
   || { echo "Vikunja dump 失败，退出"; exit 1; }
 
 # 2) ezBookkeeping 数据库文件
