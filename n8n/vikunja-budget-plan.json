@@ -17,7 +17,7 @@
     },
     {
       "parameters": {
-        "functionCode": "// 任务新建时，把 fund: 金额登记为 ezB 计划支出（预算项）\nconst e = $input.item.json;\nconst task = (e.data && e.data.task) ? e.data.task : {};\nconst labels = (task.labels || []).map(l => (l.title || l).toString());\nconst m = labels.find(x => x.startsWith('fund:'));\nif (!m) return []; // 没有资金标签则不建账\nconst parts = m.slice(5).split(':');\nconst amount = parseFloat(parts[0]);\nconst currency = parts[1] || 'CNY';\nconst account = parts[2] || 'cash'; // cash | deposit\nreturn [{\n  json: {\n    taskId: task.id,\n    title: task.title,\n    fund_amount: amount,\n    fund_currency: currency,\n    fund_account: account,\n    is_recur: labels.includes('recur')\n  }\n}];"
+        "functionCode": "// 任务新建时，把 fund: 金额登记为 ezB 计划支出（预算项）\nconst e = $input.item.json;\nconst task = (e.data && e.data.task) ? e.data.task : {};\nconst labels = (task.labels || []).map(l => (l.title || l).toString());\nconst m = labels.find(x => x.startsWith('fund:'));\nif (!m) return []; // 没有资金标签则不建账\nconst parts = m.slice(5).split(':');\nconst amount = parseFloat(parts[0]);\nif (Number.isNaN(amount)) return [];\nconst currency = parts[1] || 'CNY';\nconst account = parts[2] || 'cash'; // cash | deposit\nreturn [{\n  json: {\n    taskId: task.id,\n    title: task.title,\n    fund_amount: amount,\n    fund_currency: currency,\n    fund_account: account,\n    is_recur: labels.includes('recur')\n  }\n}];"
       },
       "id": "c2",
       "name": "Parse Fund Label",
