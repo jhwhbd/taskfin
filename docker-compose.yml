@@ -46,6 +46,9 @@ services:
       VIKUNJA_DATABASE_TYPE: sqlite
       VIKUNJA_DATABASE_PATH: /db/vikunja.db
       VIKUNJA_SERVICE_TIMEZONE: "Asia/Shanghai"
+      # 对外访问地址（带 http(s)://，缺尾斜杠会由程序自动补）。
+      # 影响邮件提醒里的任务链接、CalDAV 客户端发现、跨域(CORS)白名单。
+      VIKUNJA_SERVICE_PUBLICURL: "https://tasks.${DOMAIN}/"
       VIKUNJA_SERVICE_ENABLEREGISTRATION: "false"
       VIKUNJA_SERVICE_EMAIL: "${QQ_EMAIL}@qq.com"
       VIKUNJA_MAILER_ENABLED: "true"

@@ -1,0 +1,13 @@
+# 本项目最终部署于 Linux/Docker 容器，强制文本文件统一使用 LF 换行。
+# 作用：
+#   1) 消除 Git for Windows 的 "LF will be replaced by CRLF" 警告；
+#   2) 避免 .sh / .yml 等文件在 Windows 检出时变成 CRLF，导致容器内 shell/yaml 解析出错。
+# 仓库内部始终以 LF 存储，只是显式固定检出行为，跨平台一致。
+* text=auto eol=lf
+
+# 关键文件显式指定（在 Linux 容器运行时尤其重要）
+*.sh    text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf

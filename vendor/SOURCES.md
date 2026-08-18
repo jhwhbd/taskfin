@@ -2,18 +2,18 @@
 
 本目录收录本项目依赖的两个上游开源项目的**完整源代码快照**，目的是在万一上游仓库关闭或不可达时，本项目仍可自包含地构建、部署与维护，不依赖外部托管。
 
-## 收录清单（vendor 于 2026-08-17）
+## 收录清单（vendor 于 2026-08-18 刷新至上游最新 main）
 
 ### Vikunja
 - 上游仓库：<https://github.com/go-vikunja/vikunja>
 - 许可证：**AGPL-3.0**（强 copyleft，全文见 `vendor/vikunja/LICENSE`）
-- Vendor 版本：`7247ae69e8850ad3206a07f77f9b834601f927d9`（2026-08-17 提交）
+- Vendor 版本：`e61c81cc54a0f035baeaad1ea63066294872e028`（2026-08-17 23:07 北京时间，main 最新提交）
 - 说明：前后端合一的 monorepo（Go 后端 + Vue 前端）。本快照为 shallow clone 去除 `.git` 后的纯源码，**未做任何修改**。
 
 ### ezBookkeeping
 - 上游仓库：<https://github.com/mayswind/ezbookkeeping>
 - 许可证：**MIT**（宽松，全文见 `vendor/ezbookkeeping/LICENSE`）
-- Vendor 版本：`0f70cab8626b7a0c25c75cea920237482182de36`（2026-08-17 提交）
+- Vendor 版本：`0461abcc94b5f7e337d4736bc6f52d77ab238deb`（2026-08-18 00:28 北京时间，main 最新提交）
 - 说明：轻量自托管个人记账应用（Go + TypeScript/Vue）。本快照为 shallow clone 去除 `.git` 后的纯源码，**未做任何修改**。
 
 ## 许可证与合规义务
