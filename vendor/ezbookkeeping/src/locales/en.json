@@ -1,7 +1,7 @@
 {
     "global": {
         "app": {
-            "title": "ezBookkeeping"
+            "title": "TaskFIN"
         }
     },
     "language": {
@@ -1703,8 +1703,8 @@
     "Change Language": "Change Language",
     "Date is too early": "Date is too early",
     "User Canceled": "User Canceled",
-    "Welcome to ezBookkeeping": "Welcome to ezBookkeeping",
-    "Please log in with your ezBookkeeping account": "Please log in with your ezBookkeeping account",
+    "Welcome to ezBookkeeping": "Welcome to TaskFIN",
+    "Please log in with your ezBookkeeping account": "Please log in with your TaskFIN account",
     "Unlock Application": "Unlock Application",
     "Please enter your PIN code or use WebAuthn to unlock application": "Please enter your PIN code or use WebAuthn to unlock application",
     "Please enter your PIN code to unlock application": "Please enter your PIN code to unlock application",

@@ -18,3 +18,9 @@ Thumbs.db
 
 # ===== 本机工作留痕（AI 修改记录，不入库）=====
 docs/本轮AI修改记录.md
+
+# ===== WorkBuddy 工作区配置 =====
+.workbuddy/
+
+# ===== 临时分析脚本（不入库）=====
+scripts/_*.cjs

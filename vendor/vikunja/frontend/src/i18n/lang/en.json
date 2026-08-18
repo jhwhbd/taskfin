@@ -49,7 +49,7 @@
     "text": "The page you requested does not exist."
   },
   "ready": {
-    "loading": "Vikunja is loading…",
+    "loading": "TaskFIN is loading…",
     "errorOccured": "An error occurred:",
     "checkApiUrl": "Please check if the api url is correct.",
     "noApiUrlConfigured": "No API url was configured. Please set one below:"
@@ -244,7 +244,7 @@
         "title": "Quick Add Magic Mode",
         "disabled": "Disabled",
         "todoist": "Todoist",
-        "vikunja": "Vikunja"
+        "vikunja": "TaskFIN"
       },
       "appearance": {
         "title": "Color Scheme",
@@ -754,7 +754,7 @@
     "imprint": "Imprint",
     "privacy": "Privacy Policy",
     "closeSidebar": "Close sidebar",
-    "home": "Vikunja home",
+    "home": "TaskFIN home",
     "toggleChildProjects": "Toggle sub-projects",
     "main": "Main navigation",
     "savedFilters": "Saved filters"

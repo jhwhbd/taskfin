@@ -36,7 +36,15 @@ services:
 
   # ---- 任务管理 Vikunja（不发布主机端口，仅 NPM 内网反代）----
   vikunja:
-    image: vikunja/vikunja:${VIKUNJA_VERSION}
+    # 方案 A：从 vendored 源码构建自定义镜像（已内置 TaskFIN 名称+图标）。
+    # 如需回退到官方镜像，删除下方 build: 块并将下一行取消注释即可。
+    # image: vikunja/vikunja:${VIKUNJA_VERSION}
+    image: taskfin-vikunja:local
+    build:
+      context: ./vendor/vikunja
+      dockerfile: Dockerfile
+      args:
+        RELEASE_VERSION: taskfin
     container_name: vikunja
     volumes:
       - ./data/vikunja/files:/app/vikunja/files
@@ -64,7 +72,13 @@ services:
 
   # ---- 财务管理 ezBookkeeping（不发布主机端口）----
   ezbookkeeping:
-    image: mayswind/ezbookkeeping:${EZB_VERSION}
+    # 方案 A：从 vendored 源码构建自定义镜像（已内置 TaskFIN 名称+图标）。
+    # 如需回退到官方镜像，删除下方 build: 块并将下一行取消注释即可。
+    # image: mayswind/ezbookkeeping:${EZB_VERSION}
+    image: taskfin-ezbookkeeping:local
+    build:
+      context: ./vendor/ezbookkeeping
+      dockerfile: Dockerfile
     container_name: ezbookkeeping
     user: "1000:1000"
     volumes:
