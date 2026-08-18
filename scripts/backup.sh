@@ -67,12 +67,14 @@ fi
 # 4) 高压缩 + 写入共享 + 仅留 3 份
 echo "[4/4] 压缩并写入共享 ..."
 FILES=( "$STAGING"/vikunja-*.zip "$STAGING"/*.db "$STAGING"/ezbookkeeping.csv )
-# 去掉不存在的项
+# 去掉不存在的项；同时取出文件名（供 tar -C 使用，避免 ls 命令替换对含空格文件名分词出错）
 existing=()
 for f in "${FILES[@]}"; do [ -e "$f" ] && existing+=("$f"); done
 if [ ${#existing[@]} -eq 0 ]; then
   echo "没有可备份的文件，退出"; exit 1
 fi
+names=()
+for f in "${existing[@]}"; do names+=("$(basename "$f")"); done
 
 if command -v 7z >/dev/null 2>&1; then
   ARCHIVE="$SMB_DIR/taskfin-backup-$TS.7z"
@@ -81,11 +83,11 @@ if command -v 7z >/dev/null 2>&1; then
 elif command -v xz >/dev/null 2>&1; then
   ARCHIVE="$SMB_DIR/taskfin-backup-$TS.tar.xz"
   echo "  7z 不可用，回退 tar.xz (-9)"
-  tar -cJf "$ARCHIVE" -C "$STAGING" $(ls -1 "$STAGING" | grep -E 'vikunja-.*\.zip|\.db$|ezbookkeeping\.csv')
+  tar -cJf "$ARCHIVE" -C "$STAGING" "${names[@]}"
 else
   ARCHIVE="$SMB_DIR/taskfin-backup-$TS.tgz"
   echo "  7z/xz 均不可用，回退 tar.gz"
-  tar -czf "$ARCHIVE" -C "$STAGING" $(ls -1 "$STAGING" | grep -E 'vikunja-.*\.zip|\.db$|ezbookkeeping\.csv')
+  tar -czf "$ARCHIVE" -C "$STAGING" "${names[@]}"
 fi
 echo "  已生成: $ARCHIVE ($(du -h "$ARCHIVE" | cut -f1))"
 

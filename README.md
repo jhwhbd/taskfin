@@ -103,7 +103,7 @@ docker compose up -d
 
 > ⚠️ n8n 的 Docker tag **不带 v 前缀**（`1.123.72` 而非 `v1.123.72`），与其余服务不同，注意区分。
 
-**升级方法**：编辑 `docker-compose.yml` 顶部对应版本变量 → `docker compose pull` → `docker compose up -d`。升级前建议查看上游 CHANGELOG，确认兼容性。
+**升级方法**：编辑 `.env.example` 中对应 `*_VERSION` 变量（保存后 `cp .env.example .env` 或把改动合并进现有 `.env`）→ `docker compose pull` → `docker compose up -d`。升级前建议查看上游 CHANGELOG，确认兼容性。
 
 ## 上游源码版本校验
 
