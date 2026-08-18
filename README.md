@@ -12,7 +12,7 @@
 
 **Architecture** — All three apps run inside the internal Docker network and talk to each other without leaving the LAN. Only ports **80/443** are exposed to the public internet (via NPM). Data is stored in **SQLite**; an automated `backup.sh` performs full backups with high compression and keeps only the 3 latest copies.
 
-**Deploy** — `docker compose up -d` driven by environment variables (copy `.env.example` → `.env`). See [`docs/03-实施部署手册.md`](docs/03-实施部署手册.md) for the full step-by-step guide (Chinese). Upstream source snapshots are vendored under `vendor/` (Vikunja: AGPL-3.0, ezBookkeeping: MIT) as a safety copy.
+**Deploy** — `docker compose up -d` driven by environment variables (copy `.env.example` → `.env`). See [`docs/实施部署手册.md`](docs/实施部署手册.md) for the full step-by-step guide (Chinese). Upstream source snapshots are vendored under `vendor/` (Vikunja: AGPL-3.0, ezBookkeeping: MIT) as a safety copy.
 
 > ⚠️ This repo is **design-complete but not yet deployed to real hardware**; the n8n workflows and some parameters need live testing.
 
@@ -63,11 +63,9 @@ taskfin/
 │   ├── SOURCES.md          # 版本/许可证/更新方法
 │   ├── vikunja/            # AGPL-3.0（go-vikunja/vikunja 快照，未修改）
 │   └── ezbookkeeping/      # MIT（mayswind/ezbookkeeping 快照，未修改）
-└── docs/                   # 完整方案文档
-    ├── 01-需求与决策记录.md        # 需求收敛 + 逐轮决策时间线
-    ├── 02-审查问题与待办.md        # 历轮审查修复记录 + 仍须实机验证/待拍板项
-    ├── 03-实施部署手册.md          # 可执行部署手册（含 DDNS/NPM/初始化/Webhook/n8n/备份/移动端）
-    └── 04-项目说明（面向使用者）.md  # 给使用者的项目介绍 + 需求收集模板
+└── docs/                   # 项目文档（两份）
+    ├── 实施部署手册.md          # 可照做的部署步骤（DDNS/NPM/初始化/Webhook/n8n/备份/移动端 + 已知风险）
+    └── 项目介绍说明.md          # 项目定位、功能、架构、设计决策与当前状态
 ```
 
 > ⚠️ 本项目为 **设计阶段完成、尚未实机部署** 的资料。所有结论基于文档调研，`n8n` 工作流 JSON 与部分参数需真机联调。
@@ -97,7 +95,7 @@ docker compose up -d
 - ddns-go `http://<主机IP>:9876`（仅内网）
 - 应用通过 `tasks/fin/flow.<你的域名>` 经 HTTPS 访问
 
-详细部署、初始化、Webhook、n8n 配置、备份、移动端与已知风险，见 [`docs/03-实施部署手册.md`](docs/03-实施部署手册.md) 与 [`docs/02-审查问题与待办.md`](docs/02-审查问题与待办.md)。
+详细部署、初始化、Webhook、n8n 配置、备份、移动端与已知风险，见 [`docs/实施部署手册.md`](docs/实施部署手册.md)；项目定位、功能、架构、设计决策与当前状态见 [`docs/项目介绍说明.md`](docs/项目介绍说明.md)。
 
 ## 已知最高风险（部署前必读）
 
