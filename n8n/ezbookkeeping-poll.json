@@ -97,7 +97,7 @@
     },
     {
       "parameters": {
-        "notice": "【recur 自动勾掉闭环】\n本工作流每 5 分钟拉取 ezB 近期交易：\n• 评论含 #vk-<任务ID> → 在对应 Vikunja 任务回写「财务侧记录已更新」评论（普通任务记账回执）。\n• 评论含 #recur-<标识> → 调 Vikunja API 找出「带 recur 标签 + 同名 #recur-<标识> 标签 + 未完成」的那一笔 recurring 任务，POST /tasks/{id} 置 done=true，并回写「by:ezB周期交易 已扣款」评论，实现「财务真扣了 → 任务自动勾掉」。\n\n⚠️ 依赖 B6（实机验证）：Vikunja recurring 任务完成后生成的新实例必须继承 `recur` 与 `#recur-<标识>` 标签，否则按标签匹配不到新实例、跨月闭环断裂（届时退化为手动勾选即可）。\n⚠️ 依赖 B2：节点 typeVersion（cron 2 / httpRequest 4.2 / code 2 / if 2）需与所装 n8n 版本匹配。",
+        "notice": "【recur 自动勾掉闭环】\n本工作流每 5 分钟拉取 ezB 近期交易：\n• 评论含 #vk-<任务ID> → 在对应 Vikunja 任务回写「财务侧记录已更新」评论（普通任务记账回执）。\n• 评论含 #recur-<标识> → 调 Vikunja API 找出「带 recur 标签 + 同名 #recur-<标识> 标签 + 未完成」的那一笔 recurring 任务，POST /tasks/{id} 置 done=true，并回写「by:ezB周期交易 已扣款」评论，实现「财务真扣了 → 任务记录完成」。\n\n⚠️ Vikunja 重复任务完成语义（见文档 §5.6C / B6）：Vikunja 重复任务**不生成新实例**，而是同一任务 id 反复推进到期日；被标记完成后会被原生**重置为未完成**（源码 setTaskDates* 均把 Done 置回 false），但 `done_at` 时间戳 + 本节点回写的评论会被持久记录，到期日自动顺延到下一周期。因此 poll 按 `recur` + `#recur-<标识>` 标签匹配能**稳定跨月命中同一任务**（标签长期不变，无需每月重建），闭环持续有效；视觉上任务不会常驻「已勾选」（Vikunja 设计本意），若必须视觉常驻需改用非重复任务或另设专用跟踪任务。\n⚠️ 只需在 setup 时给 recur 任务**一次性**打上 `recur` + `#recur-<标识>` 两个标签（与其 ezB 周期交易评论里的 `#recur-<标识>` 同名）即可，无需担心标签继承。\n⚠️ 依赖 B2：节点 typeVersion（cron 2 / httpRequest 4.2 / code 2 / if 2）需与所装 n8n 版本匹配。",
         "notesInFlow": true
       },
       "id": "b7",
