@@ -39,9 +39,8 @@ taskfin/
 │   ├── vikunja-budget-plan.json        # 任务新建 → 登计划支出（预算）
 │   ├── ezbookkeeping-poll.json         # 财务 → 任务（轮询回贴 + recur 自动勾掉）
 │   ├── ezbookkeeping-bill-reminder.json# 账单临期提醒模板（默认禁用，排除贷款）
-│   ├── backup-csv-7z-email.json        # 弃用占位，勿用
-│   └── Dockerfile                      # 备用（当前 compose 用官方镜像）
 ├── vendor/                 # 上游源码保险副本（详见 vendor/SOURCES.md）
+│   ├── SOURCES.md          # 版本/许可证/更新方法
 │   ├── vikunja/            # AGPL-3.0（go-vikunja/vikunja 快照，未修改）
 │   └── ezbookkeeping/      # MIT（mayswind/ezbookkeeping 快照，未修改）
 └── docs/                   # 完整方案文档（设计阶段 v2.7）
@@ -87,6 +86,30 @@ docker compose up -d
 1. **CalDAV 手机闹钟**：Vikunja 的 CalDAV 可能只同步事件、不导出 VALARM，手机可能不弹闹钟；可靠提醒仍是 QQ 邮件兜底。
 2. **n8n 四个 JSON 未实机校验**：`fund:` 标签解析、金额×100、`typeVersion`、Webhook 路径需在真机联调。
 3. **`/share/backup` 真实路径**：群晖共享多挂在 `/volume1/share/backup`，`scripts/backup.sh` 里的 `SMB_DIR` 需按真实路径改。
+
+## 镜像版本锁定
+
+`docker-compose.yml` 中所有镜像均使用**具体版本号**（非 `latest`），以保证每次启动拉到的镜像一致、出问题时可定位。版本在文件顶部以变量集中声明：
+
+| 服务 | 镜像 | 当前锁定版本 |
+|---|---|---|
+| Nginx Proxy Manager | jc21/nginx-proxy-manager | v2.15.1 |
+| ddns-go | jeessy/ddns-go | v6.17.5 |
+| Vikunja | vikunja/vikunja | v2.5.0 |
+| ezBookkeeping | mayswind/ezbookkeeping | v1.6.1 |
+| n8n | n8nio/n8n | 1.123.72 |
+
+> ⚠️ n8n 的 Docker tag **不带 v 前缀**（`1.123.72` 而非 `v1.123.72`），与其余服务不同，注意区分。
+
+**升级方法**：编辑 `docker-compose.yml` 顶部对应版本变量 → `docker compose pull` → `docker compose up -d`。升级前建议查看上游 CHANGELOG，确认兼容性。
+
+## 上游源码版本校验
+
+仓库自带 `scripts/check-vendor.sh`，可在群晖 SSH 中运行，比对 `vendor/` 中收录的上游源码哈希与 GitHub 最新提交是否一致，便于判断何时需要更新 vendor 快照：
+
+```bash
+bash scripts/check-vendor.sh
+```
 
 ## 第三方源码与许可证
 

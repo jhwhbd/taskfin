@@ -15,7 +15,7 @@ set -euo pipefail
 
 # ---------- 可配置区（按你环境修改） ----------
 PROJECT_DIR="/volume1/docker/taskfin"          # compose 项目目录
-STAGING="$PROJECT_DIR/backup_staging"          # 临时落盘目录（已挂进 vikunja 容器 /backup）
+STAGING="$PROJECT_DIR/data/backup_staging"     # 临时落盘目录（已挂进 vikunja 容器 /backup；注意：与 compose 卷 ./data/backup_staging 对应，含 data/ 前缀）
 # 备份写入目标：本机群晖共享文件夹 /share/backup（Windows 侧 \\<群晖内网IP>\share\backup）
 # 说明：DSM 的共享文件夹实际挂载路径通常为 /volume1/share/backup；若你的 share 名不是 share，
 #       或共享挂在别的 volume（如 /volume2），请把下面路径改成真实绝对路径。
@@ -44,7 +44,7 @@ docker exec vikunja sh -c "cd /backup && /app/vikunja/vikunja dump" \
 
 # 2) ezBookkeeping 数据库文件
 echo "[2/4] 拷贝 ezBookkeeping 数据库 ..."
-cp -f "$PROJECT_DIR"/ezbookkeeping/data/*.db "$STAGING"/ 2>/dev/null \
+cp -f "$PROJECT_DIR"/data/ezbookkeeping/data/*.db "$STAGING"/ 2>/dev/null \
   || echo "  警告：未找到 ezB db 文件，跳过"
 
 # 3) ezBookkeeping 人读 CSV（可选）

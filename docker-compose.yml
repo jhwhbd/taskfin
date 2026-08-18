@@ -1,8 +1,7 @@
-version: '3.8'
-
 # 自托管「任务 + 财务」系统
 # 服务：NPM(反代/HTTPS) · ddns-go(动态DNS) · Vikunja(任务) · ezBookkeeping(财务) · n8n(桥接)
-# 所有密钥/域名走环境变量，详见 .env.example；真实 .env 不入库（见 .gitignore）。
+# 所有密钥/域名走环境变量（.env，不入库，见 .gitignore）。
+# 镜像版本锁定在 .env.example（随文件复制为 .env），compose 用 ${xxx_VERSION} 引用。
 # 运行时数据全部落在 ./data/ 下（已 gitignore），首次启动见底部 mkdir 命令。
 
 networks:
@@ -12,11 +11,12 @@ networks:
 services:
   # ---- 唯一对公网开放 80/443 ----
   npm:
-    image: jc21/nginx-proxy-manager:latest
+    image: jc21/nginx-proxy-manager:${NPM_VERSION}
     container_name: npm
     ports:
       - "80:80"
       - "443:443"
+      - "81:81"   # NPM 管理后台（仅内网，勿对公网/WAN 暴露）
     volumes:
       - ./data/npm/data:/data
       - ./data/npm/letsencrypt:/etc/letsencrypt
@@ -25,7 +25,7 @@ services:
 
   # ---- 动态 DNS（仅内网 :9876 管理）----
   ddns-go:
-    image: jeessy/ddns-go:latest
+    image: jeessy/ddns-go:${DDNS_VERSION}
     container_name: ddns-go
     ports:
       - "9876:9876"
@@ -36,7 +36,7 @@ services:
 
   # ---- 任务管理 Vikunja（不发布主机端口，仅 NPM 内网反代）----
   vikunja:
-    image: vikunja/vikunja:latest
+    image: vikunja/vikunja:${VIKUNJA_VERSION}
     container_name: vikunja
     volumes:
       - ./data/vikunja/files:/app/vikunja/files
@@ -61,7 +61,7 @@ services:
 
   # ---- 财务管理 ezBookkeeping（不发布主机端口）----
   ezbookkeeping:
-    image: mayswind/ezbookkeeping:latest
+    image: mayswind/ezbookkeeping:${EZB_VERSION}
     container_name: ezbookkeeping
     user: "1000:1000"
     volumes:
@@ -90,11 +90,15 @@ services:
     networks: [appnet]
 
   # ---- 自动化桥接 n8n（不发布主机端口）----
+  # depends_on: n8n 桥接依赖 Vikunja/ezB 就绪；首次启动 n8n 可能先于上游，手动重跑触发器即可。
   n8n:
-    image: n8nio/n8n:latest
+    image: n8nio/n8n:${N8N_VERSION}
     container_name: n8n
     volumes:
       - ./data/n8n:/home/node/.n8n
+    depends_on:
+      - vikunja
+      - ezbookkeeping
     environment:
       TZ: "Asia/Shanghai"
       GENERIC_TIMEZONE: "Asia/Shanghai"
@@ -104,7 +108,7 @@ services:
     networks: [appnet]
 
 # ===== 首次启动（在仓库根目录执行）=====
-# cp .env.example .env   # 然后填好真实值
+# cp .env.example .env   # 然后填好真实值（包含镜像版本）
 # mkdir -p data/npm/data data/npm/letsencrypt data/ddns-go \
 #          data/vikunja/files data/vikunja/db \
 #          data/ezbookkeeping/data data/ezbookkeeping/storage \
