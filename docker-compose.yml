@@ -36,8 +36,10 @@ services:
 
   # ---- 任务管理 Vikunja（不发布主机端口，仅 NPM 内网反代）----
   vikunja:
-    # 方案 A：从 vendored 源码构建自定义镜像（已内置 TaskFIN 名称+图标）。
-    # 如需回退到官方镜像，删除下方 build: 块并将下一行取消注释即可。
+    # 方案 A：从 vendored 源码构建自定义镜像（已内置 TaskFIN 名称+图标），
+    # 构建产物 tagged 为 taskfin-vikunja:local（见下方 image: 行）。
+    # 如需回退到官方镜像：① 删除下方 build: 块；② 将 image: taskfin-vikunja:local
+    #    改为注释，并取消下一行（官方镜像）的注释。回退后界面恢复原厂 Vikunja 名称/图标。
     # image: vikunja/vikunja:${VIKUNJA_VERSION}
     image: taskfin-vikunja:local
     build:
@@ -72,8 +74,10 @@ services:
 
   # ---- 财务管理 ezBookkeeping（不发布主机端口）----
   ezbookkeeping:
-    # 方案 A：从 vendored 源码构建自定义镜像（已内置 TaskFIN 名称+图标）。
-    # 如需回退到官方镜像，删除下方 build: 块并将下一行取消注释即可。
+    # 方案 A：从 vendored 源码构建自定义镜像（已内置 TaskFIN 名称+图标），
+    # 构建产物 tagged 为 taskfin-ezbookkeeping:local（见下方 image: 行）。
+    # 如需回退到官方镜像：① 删除下方 build: 块；② 将 image: taskfin-ezbookkeeping:local
+    #    改为注释，并取消下一行（官方镜像）的注释。回退后界面恢复原厂 ezBookkeeping 名称/图标。
     # image: mayswind/ezbookkeeping:${EZB_VERSION}
     image: taskfin-ezbookkeeping:local
     build:

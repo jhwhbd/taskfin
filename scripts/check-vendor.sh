@@ -8,6 +8,11 @@
 # 依赖：git（用于 ls-remote）
 # 说明：vendor 目录已去除 .git，本地无法用 git log 查看版本；
 #       本脚本通过 GitHub API 比对上游 HEAD 与 SOURCES.md 记录。
+#
+# ⚠️ 重要：vendor/ 已被「品牌化改造」（应用名/图标/PWA 启动图统一改为 TaskFIN，
+#    见 branding/ 与 scripts/gen-icons.cjs、gen-splash.cjs）。本脚本【不哈希本地文件】，
+#    只比对「上游 HEAD 是否前进」，因此你的品牌修改【不会】触发误报；
+#    但若上游前进导致「落后」，重新拉取上游会【覆盖品牌文件】，需重跑品牌脚本。
 # =============================================================
 set -euo pipefail
 
@@ -17,6 +22,9 @@ REPOS=(
 )
 
 echo "===== vendor 上游源码版本校验 ====="
+echo ""
+echo "⚠️ 注意：vendor/ 已做品牌化改造（TaskFIN），本脚本只检测『上游是否前进』，"
+echo "   不会因你的品牌修改而误报；但上游前进后若重新拉取，会覆盖品牌文件，需重跑品牌脚本。"
 echo ""
 for entry in "${REPOS[@]}"; do
   IFS='|' read -r name repo branch <<< "$entry"
@@ -47,9 +55,13 @@ for entry in "${REPOS[@]}"; do
     echo "  ✅ 一致。vendor 快照与上游 $branch 最新提交对齐（$remote_short）。"
   else
     echo "  ⚠️  落后。vendor 记录 $recorded，上游 $branch 最新为 $remote_short"
-    echo "      如需更新：git clone --depth 1 https://github.com/$repo.git /tmp/$name \\"
-    echo "                 && rm -rf /tmp/$name/.git vendor/$name && cp -r /tmp/$name vendor/$name \\"
-    echo "                 && 更新 vendor/SOURCES.md 中的哈希与日期"
+    echo "      ⚠️  vendor/ 含品牌化修改，直接重新拉取会【覆盖 TaskFIN 品牌文件】！"
+    echo "      如需更新上游，请按以下步骤保留品牌："
+    echo "        1) git clone --depth 1 https://github.com/$repo.git /tmp/$name"
+    echo "        2) 用 /tmp/$name 覆盖 vendor/$name（保留 .git 外的全部文件，注意先备份你的品牌改动）"
+    echo "        3) 更新 vendor/SOURCES.md 中的哈希与日期"
+    echo "        4) 重新执行品牌化：node scripts/gen-icons.cjs && node scripts/gen-splash.cjs"
+    echo "           （必要时再按 README「品牌化」段重改名称字符串）"
   fi
   echo ""
 done

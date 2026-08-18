@@ -12,7 +12,7 @@
 
 **Architecture** — All three apps run inside the internal Docker network and talk to each other without leaving the LAN. Only ports **80/443** are exposed to the public internet (via NPM). Data is stored in **SQLite**; an automated `backup.sh` performs full backups with high compression and keeps only the 3 latest copies.
 
-**Deploy** — `docker compose up -d` driven by environment variables (copy `.env.example` → `.env`). See [`docs/实施部署手册.md`](docs/实施部署手册.md) for the full step-by-step guide (Chinese). Upstream source snapshots are vendored under `vendor/` (Vikunja: AGPL-3.0, ezBookkeeping: MIT) as a safety copy.
+**Deploy** — `docker compose up -d` driven by environment variables (copy `.env.example` → `.env`). See [`docs/实施部署手册.md`](docs/实施部署手册.md) for the full step-by-step guide (Chinese). Upstream source is vendored under `vendor/` (Vikunja: AGPL-3.0, ezBookkeeping: MIT) and **rebranded to TaskFIN** (app name, icons, PWA splash screens) — the Vikunja & ezBookkeeping images are **built from this modified source** (not pulled from upstream registries). See [`vendor/SOURCES.md`](vendor/SOURCES.md).
 
 > ⚠️ This repo is **design-complete but not yet deployed to real hardware**; the n8n workflows and some parameters need live testing.
 
@@ -59,16 +59,18 @@ taskfin/
 │   ├── vikunja-budget-plan.json        # 任务新建 → 登计划支出（预算）
 │   ├── ezbookkeeping-poll.json         # 财务 → 任务（轮询回贴 + recur 自动勾掉）
 │   ├── ezbookkeeping-bill-reminder.json# 账单临期提醒模板（默认禁用，排除贷款）
-├── vendor/                 # 上游源码保险副本（详见 vendor/SOURCES.md）
+├── vendor/                 # 上游源码（已做品牌化改造，详见 vendor/SOURCES.md）
 │   ├── SOURCES.md          # 版本/许可证/更新方法
-│   ├── vikunja/            # AGPL-3.0（go-vikunja/vikunja 快照，未修改）
-│   └── ezbookkeeping/      # MIT（mayswind/ezbookkeeping 快照，未修改）
+│   ├── vikunja/            # AGPL-3.0（go-vikunja/vikunja 快照，已做品牌化改造）
+│   └── ezbookkeeping/      # MIT（mayswind/ezbookkeeping 快照，已做品牌化改造）
 └── docs/                   # 项目文档（两份）
     ├── 实施部署手册.md          # 可照做的部署步骤（DDNS/NPM/初始化/Webhook/n8n/备份/移动端 + 已知风险）
     └── 项目介绍说明.md          # 项目定位、功能、架构、设计决策与当前状态
 ```
 
 > ⚠️ 本项目为 **设计阶段完成、尚未实机部署** 的资料。所有结论基于文档调研，`n8n` 工作流 JSON 与部分参数需真机联调。
+
+> 🎨 **品牌化（Rebranding）**：本项目的 Vikunja 与 ezBookkeeping 源码已统一改造为 **TaskFIN** 品牌——应用名（含全部界面语言与后端邮件署名）、favicon、PWA 图标、iOS 启动图、logo 均已替换；保留上游 "Powered by" 与 GitHub 链接作开源合规署名。两份组件镜像**从 `vendor/` 里的修改后源码构建**（见下方「镜像版本锁定」与部署手册 §2），而非拉取上游官方镜像。品牌素材源在 `branding/`，生成脚本为 `scripts/gen-icons.cjs` 与 `scripts/gen-splash.cjs`。
 
 ## 快速开始
 
@@ -133,10 +135,10 @@ bash scripts/check-vendor.sh
 
 | 项目 | 上游 | 许可证 | 在本项目中的角色 |
 |---|---|---|---|
-| Vikunja | go-vikunja/vikunja | **AGPL-3.0** | 任务管理（日常用官方镜像；源码为保险副本） |
+| Vikunja | go-vikunja/vikunja | **AGPL-3.0** | 任务管理（从 vendored 源码构建品牌化镜像，UI 显示 TaskFIN） |
 | ezBookkeeping | mayswind/ezbookkeeping | **MIT** | 财务管理（同上） |
 
-> ⚠️ **AGPL-3.0 义务提示**：Vikunja 是强 copyleft 许可证。若你**修改其源码**并**通过网络交互方式向他人提供该服务**（例如自托管并允许家庭成员/其他用户访问），须按 AGPL 第 13 条向这些用户提供修改后的对应源码。本项目当前为未修改快照，纯自用一般不触发该义务。
+> ⚠️ **AGPL-3.0 义务提示**：Vikunja 是强 copyleft 许可证。本项目**已修改 Vikunja 源码**（品牌化：应用名、图标、PWA 启动图统一改为 TaskFIN，并经 `docker-compose.yml` 从源码构建镜像）。若你**通过网络交互方式向他人（如家庭成员）提供该服务**，须按 AGPL 第 13 条向这些用户提供修改后的对应源码——**本仓库（含 `vendor/vikunja/` 的修改后源码）即满足该义务**，部署时保留仓库可访问即可。纯单机自用一般不触发该义务。
 
 ## License
 
