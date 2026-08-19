@@ -79,7 +79,8 @@ for f in "${existing[@]}"; do names+=("$(basename "$f")"); done
 if command -v 7z >/dev/null 2>&1; then
   ARCHIVE="$SMB_DIR/taskfin-backup-$TS.7z"
   echo "  使用 7z -mx=9 (LZMA2 最高压缩率)"
-  7z a -t7z -mx=9 -mmt=2 "$ARCHIVE" "${existing[@]}"
+  # P5：进入 STAGING 后用相对文件名打包，包内结构与 tar 分支一致（仅文件名，不含 $STAGING/ 层级）
+  ( cd "$STAGING" && 7z a -t7z -mx=9 -mmt=2 "$ARCHIVE" "${names[@]}" )
 elif command -v xz >/dev/null 2>&1; then
   ARCHIVE="$SMB_DIR/taskfin-backup-$TS.tar.xz"
   echo "  7z 不可用，回退 tar.xz (-9)"
@@ -91,9 +92,13 @@ else
 fi
 echo "  已生成: $ARCHIVE ($(du -h "$ARCHIVE" | cut -f1))"
 
-# 仅保留最近 3 份
-echo "  清理旧备份，仅留最近 3 份 ..."
-ls -t "$SMB_DIR"/taskfin-backup-*.* | tail -n +4 | xargs -r rm -f
+# 仅保留最近 3 份（P6：按扩展名分别保留，避免更换压缩工具后混合扩展名误删；用 while 读行而非 ls|xargs 分词，文件名安全）
+echo "  清理旧备份，每种格式仅留最近 3 份 ..."
+for ext in 7z tar.xz tgz; do
+  ls -t "$SMB_DIR"/taskfin-backup-*."$ext" 2>/dev/null | tail -n +4 | while IFS= read -r f; do
+    rm -f "$f"
+  done
+done
 echo "  当前共享内备份："
 ls -lh "$SMB_DIR"/taskfin-backup-*.* 2>/dev/null | awk '{print $5, $9}'
 

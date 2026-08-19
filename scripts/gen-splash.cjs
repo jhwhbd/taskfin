@@ -86,8 +86,7 @@ function buildLaunchSvg(W, H, logoSize, textSize, gap) {
   const textY = logoY + logoSize + gap + textSize * 0.78;  // baseline 调整
 
   // 转 path d 字符串（用 <g transform> 避免数值问题）
-  const txLogo = logoX - (tBb === undefined ? 0 : 0);  // logo 直接用 <image> 或内联 svg
-  // 实际上我们直接嵌入 taskfin.svg 的内容并缩放
+  // 直接嵌入 taskfin.svg 的内容并缩放
   const logoSvgContent = fs.readFileSync(LOGO_SVG, 'utf8')
     .replace(/<svg[^>]*>/, '')
     .replace(/<\/svg>\s*$/, '');

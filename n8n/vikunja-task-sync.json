@@ -17,13 +17,23 @@
     },
     {
       "parameters": {
-        "functionCode": "// 解析 Vikunja webhook 载荷，提取标签中的 fund:/res:/deliv:/milestone\nconst e = $input.item.json;\nconst evt = e.event_name;\nconst task = (e.data && e.data.task) ? e.data.task : {};\nconst labels = (task.labels || []).map(l => (l.title || l).toString());\nfunction parseLabel(prefix){\n  const m = labels.find(x => x.startsWith(prefix + ':'));\n  return m ? m.slice(prefix.length + 1) : null;\n}\nconst fund = parseLabel('fund'); // 形如 5000:CNY:cash\nif (!fund) return []; // 无 fund: 标签则不建账（避免向 ezB 生成 ¥0 交易）\nlet amount = null, currency = 'CNY', account = 'cash';\nconst parts = fund.split(':');\namount = parseFloat(parts[0]);\nif (Number.isNaN(amount)) return []; // 标签格式错误（如 fund:abc:CNY:cash）→ 跳过，避免 NaN/¥0 建账\nif (parts[1]) currency = parts[1];\nif (parts[2]) account = parts[2]; // cash | deposit\nreturn [{\n  json: {\n    event_name: evt,\n    taskId: task.id,\n    projectId: task.project_id,\n    title: task.title,\n    done: !!task.done,\n    labels: labels,\n    fund_amount: amount,\n    fund_currency: currency,\n    fund_account: account,\n    is_recur: labels.includes('recur'),\n    res: parseLabel('res'),\n    deliv: parseLabel('deliv'),\n    is_milestone: labels.includes('milestone')\n  }\n}];"
+        "functionCode": "// P1 防御：校验 webhook 静态密钥（?secret=）。失败直接丢弃。\nconst expected = (typeof $vars !== 'undefined' && $vars && $vars.webhook_secret) ? $vars.webhook_secret : '';\nconst q = ($input.item.json && $input.item.json.query) || {};\nconst got = q.secret || '';\nif (!(expected && got && got === expected)) {\n  return [];\n}\nreturn $input.all();"
+      },
+      "id": "a1b",
+      "name": "Auth Guard (secret)",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [430, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// 解析 Vikunja webhook 载荷，提取标签中的 fund:/res:/deliv:/milestone\nconst e = $input.item.json;\nconst evt = e.event_name;\nconst task = (e.data && e.data.task) ? e.data.task : {};\nconst labels = (task.labels || []).map(l => (l.title || l).toString());\nfunction parseLabel(prefix){\n  const m = labels.find(x => x.startsWith(prefix + ':'));\n  return m ? m.slice(prefix.length + 1) : null;\n}\nconst fund = parseLabel('fund');\nif (!fund) return []; // 无 fund: 标签则不建账\nlet amount = null, currency = 'CNY', account = 'cash';\nconst parts = fund.split(':');\namount = parseFloat(parts[0]);\nif (Number.isNaN(amount)) return []; // 标签格式错误 → 跳过，避免 NaN/¥0 建账\nif (parts[1]) currency = parts[1];\nif (parts[2]) account = parts[2];\nreturn [{\n  json: {\n    event_name: evt,\n    taskId: task.id,\n    projectId: task.project_id,\n    title: task.title,\n    done: !!task.done,\n    labels: labels,\n    fund_amount: amount,\n    fund_currency: currency,\n    fund_account: account,\n    is_recur: labels.includes('recur'),\n    res: parseLabel('res'),\n    deliv: parseLabel('deliv'),\n    is_milestone: labels.includes('milestone')\n  }\n}];"
       },
       "id": "a2",
       "name": "Parse Labels",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [480, 300]
+      "position": [610, 300]
     },
     {
       "parameters": {
@@ -41,7 +51,33 @@
       "name": "Is Completed?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [710, 300]
+      "position": [840, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// P2 防重发护栏：若任务评论里已有「已自动记账」回执（含 #vk-<taskId>），说明本次/历史已完成真实记账，\n// 跳过，避免编辑已完成任务、或取消完成后再完成导致重复记 type=3 真实支出。\nconst taskId = $json.taskId;\nconst auth = 'Bearer ' + $vars.vikunja_token;\nconst base = 'http://vikunja:3456/api/v1';\ntry {\n  const resp = await this.helpers.httpRequest({ method:'GET', url: base + '/tasks/' + taskId + '/comments', headers:{Authorization:auth,'Content-Type':'application/json'}, json:true });\n  const comments = Array.isArray(resp) ? resp : (resp.comments || []);\n  const marker = '#vk-' + taskId;\n  const already = comments.some(c => { const t = (c.comment || c.text || ''); return t.includes('已自动记账到 ezBookkeeping') || t.includes(marker); });\n  return [{ json: { ...$json, alreadyAccounted: already } }];\n} catch (e) {\n  // 取评论失败：保守放行（仍记账），避免漏记真实支出；异常仅记录\n  return [{ json: { ...$json, alreadyAccounted: false, commentCheckError: (e && e.message) ? e.message : String(e) } }];\n}"
+      },
+      "id": "a3b",
+      "name": "Check Accounted",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1070, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true },
+          "combinator": "and",
+          "conditions": [
+            { "leftValue": "={{ $json.alreadyAccounted }}", "rightValue": true, "operator": { "type": "boolean", "operation": "equals" } }
+          ]
+        }
+      },
+      "id": "a3c",
+      "name": "Already Accounted?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1300, 300]
     },
     {
       "parameters": {
@@ -73,7 +109,7 @@
       "name": "ezB Create Expense",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [950, 200]
+      "position": [1530, 200]
     },
     {
       "parameters": {
@@ -98,13 +134,21 @@
       "name": "Vikunja Comment Back",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1180, 200]
+      "position": [1760, 200]
     }
   ],
   "connections": {
-    "Vikunja Webhook": { "main": [ [ { "node": "Parse Labels", "type": "main", "index": 0 } ] ] },
+    "Vikunja Webhook": { "main": [ [ { "node": "Auth Guard (secret)", "type": "main", "index": 0 } ] ] },
+    "Auth Guard (secret)": { "main": [ [ { "node": "Parse Labels", "type": "main", "index": 0 } ] ] },
     "Parse Labels": { "main": [ [ { "node": "Is Completed?", "type": "main", "index": 0 } ] ] },
     "Is Completed?": {
+      "main": [
+        [ { "node": "Check Accounted", "type": "main", "index": 0 } ],
+        []
+      ]
+    },
+    "Check Accounted": { "main": [ [ { "node": "Already Accounted?", "type": "main", "index": 0 } ] ] },
+    "Already Accounted?": {
       "main": [
         [ { "node": "ezB Create Expense", "type": "main", "index": 0 } ],
         []

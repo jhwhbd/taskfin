@@ -18,12 +18,19 @@
 #   EZB_ADMIN_EMAIL="你@qq.com" EZB_ADMIN_PASS="强密码" \
 #     bash /volume1/docker/taskfin/scripts/init.sh
 #   或：bash /volume1/docker/taskfin/scripts/init.sh "你@qq.com" "强密码"
+#   可选：VIKUNJA_ADMIN_USER="admin"（默认 admin）指定首管理员用户名；
+#        WEBHOOK_SECRET 在 .env 中设置（见 .env.example），脚本会校验其占位符。
 # =============================================================
 set -euo pipefail
+
+# 项目目录（用于定位 .env 做占位符校验）
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # ---------- 变量（环境变量优先，否则交互提示） ----------
 EZB_ADMIN_EMAIL="${EZB_ADMIN_EMAIL:-${1:-}}"
 EZB_ADMIN_PASS="${EZB_ADMIN_PASS:-${2:-}}"
+VIKUNJA_ADMIN_USER="${VIKUNJA_ADMIN_USER:-admin}"
 
 if [ -z "$EZB_ADMIN_EMAIL" ]; then
   read -r -p "管理员邮箱 (QQ邮箱，用于 Vikunja/ezB 首账号): " EZB_ADMIN_EMAIL
@@ -37,14 +44,41 @@ if [ -z "$EZB_ADMIN_EMAIL" ] || [ -z "$EZB_ADMIN_PASS" ]; then
   exit 1
 fi
 
+# ---------- 0) .env 占位符校验（P10，仅警告不阻断） ----------
+ENV_FILE="$PROJECT_DIR/.env"
+if [ -f "$ENV_FILE" ]; then
+  echo "[0/1] 校验 .env 占位符 ..."
+  _qq=$(grep -E '^QQ_AUTH_CODE=' "$ENV_FILE" | head -1 | cut -d= -f2-)
+  _ezb=$(grep -E '^EZB_SECRET_KEY=' "$ENV_FILE" | head -1 | cut -d= -f2-)
+  _wh=$(grep -E '^WEBHOOK_SECRET=' "$ENV_FILE" | head -1 | cut -d= -f2-)
+  check_env() {
+    local key="$1" val="$2" hint="$3"
+    if [ -z "$val" ] || echo "$val" | grep -qiE "yourdomain|10001|xxxx|replace-with|change-me|example"; then
+      echo "  ⚠️  .env 的 $key 疑似未修改占位符（$hint）"
+    fi
+  }
+  check_env "QQ_AUTH_CODE" "$_qq" "16 位 QQ 授权码"
+  check_env "EZB_SECRET_KEY" "$_ezb" "openssl rand -base64 32 生成的随机密钥"
+  check_env "WEBHOOK_SECRET" "$_wh" "openssl rand -hex 16 生成的 webhook 密钥（需同步 n8n 变量 webhook_secret）"
+  echo "  校验完成（仅警告，不阻断）。"
+else
+  echo "[0/1] 未找到 $ENV_FILE，跳过占位符校验（你可能在网页/环境变量中直接配置）。"
+fi
+
 # ---------- 1) Vikunja 创建首管理员（部署手册 §5.1 CLI 兜底） ----------
-echo "[1/1] 创建 Vikunja 管理员账号 ($EZB_ADMIN_EMAIL) ..."
-docker exec vikunja /app/vikunja/vikunja user create \
-  --username admin \
+echo "[1/1] 创建 Vikunja 管理员账号 ($VIKUNJA_ADMIN_USER / $EZB_ADMIN_EMAIL) ..."
+OUT=$(docker exec vikunja /app/vikunja/vikunja user create \
+  --username "$VIKUNJA_ADMIN_USER" \
   --email "$EZB_ADMIN_EMAIL" \
-  --password "$EZB_ADMIN_PASS" \
-  && echo "  完成（若提示用户已存在可忽略）" \
-  || echo "  警告：创建失败，可能已存在或容器未就绪，请改在网页注册"
+  --password "$EZB_ADMIN_PASS" 2>&1)
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo "  完成（账号 $VIKUNJA_ADMIN_USER 已创建或已存在）。"
+elif echo "$OUT" | grep -qiE "already|exist|已存在"; then
+  echo "  提示：账号 $VIKUNJA_ADMIN_USER 已存在，可忽略（如需重置请用网页或 CLI）。"
+else
+  echo "  警告：创建失败（$OUT）。可能容器未就绪或参数错误，请改在网页注册。"
+fi
 
 echo "===== 初始化 CLI 步骤完成 ====="
 echo "接下来请人工完成（网页）："
