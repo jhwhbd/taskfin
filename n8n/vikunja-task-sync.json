@@ -101,7 +101,7 @@
             { "name": "utcOffset", "value": 480 },
             { "name": "sourceAccountId", "value": "={{ $json.fund_account === 'deposit' ? $vars.ezb_account_deposit_id : $vars.ezb_account_cash_id }}" },
             { "name": "sourceAmount", "value": "={{ Math.round($json.fund_amount * 100) }}" },
-            { "name": "comment", "value": "=任务完成记账: {{ $json.title }} #vk-{{ $json.taskId }}" }
+            { "name": "comment", "value": "=任务完成记账: {{ String($json.title||'').slice(0,200) }} #vk-{{ $json.taskId }}" }
           ]
         }
       },

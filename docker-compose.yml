@@ -126,7 +126,10 @@ services:
       TZ: "Asia/Shanghai"
       GENERIC_TIMEZONE: "Asia/Shanghai"
       # n8n 1.x 用内置 Owner 账号（首次登录设密码），不再用 N8N_BASIC_AUTH
-      WEBHOOK_URL: "https://flow.${DOMAIN}/"
+      # P3：经 NPM(HTTPS) 反代时，口令 Cookie 需 Secure 属性才能写入，否则登录反复跳转
+      N8N_SECURE_COOKIE: "true"
+      N8N_PROTOCOL: "https"
+      WEBHOOK_URL: "https://flow.${DOMAIN}"
     restart: unless-stopped
     networks: [appnet]
 

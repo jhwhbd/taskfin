@@ -17,7 +17,7 @@ const fs = require('fs');
 const path = require('path');
 const opentype = require('opentype.js');
 const { Resvg } = require('@resvg/resvg-js');
-const pngToIco = require('png-to-ico').default;
+const pngToIco = require('png-to-ico').default || require('png-to-ico');
 
 const ROOT = path.resolve(__dirname, '..');
 const FONT = path.join(ROOT, 'branding', 'fonts', 'OpenSans-SemiBold.ttf');
@@ -50,7 +50,7 @@ function buildSvg(fill, fit /* 0..1, 内容占画布比例 */, noFill) {
 }
 
 const svgColor = buildSvg(COLOR, 1.0);          // 标准彩色版（内容占满，两侧留白）
-const svgMono = buildSvg('#000000', 1.0, true);  // safari-pinned：纯黑单色无 fill（作蒙版）
+const svgMono = buildSvg('#000000', 1.0);  // safari-pinned：纯黑单色（Safari 固定标签蒙版需实体填充，避免空白）
 const svgMask = buildSvg(COLOR, 0.8);            // maskable：内容收进中央 80% 安全区
 
 fs.mkdirSync(path.join(ROOT, 'branding'), { recursive: true });

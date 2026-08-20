@@ -70,7 +70,7 @@ taskfin/
 
 > ⚠️ 本项目为 **设计阶段完成、尚未实机部署** 的资料。所有结论基于文档调研，`n8n` 工作流 JSON 与部分参数需真机联调。
 
-> 🎨 **品牌化（Rebranding）**：本项目的 Vikunja 与 ezBookkeeping 源码已统一改造为 **TaskFIN** 品牌——应用名（含全部界面语言与后端邮件署名）、favicon、PWA 图标、iOS 启动图、logo 均已替换；保留上游 "Powered by" 与 GitHub 链接作开源合规署名。两份组件镜像**从 `vendor/` 里的修改后源码构建**（见下方「镜像版本锁定」与部署手册 §2），而非拉取上游官方镜像。品牌素材源在 `branding/`，生成脚本为 `scripts/gen-icons.cjs` 与 `scripts/gen-splash.cjs`。
+> 🎨 **品牌化（Rebranding）**：本项目的 Vikunja 与 ezBookkeeping 源码已统一改造为 **TaskFIN** 品牌——应用名（含全部界面语言与后端邮件署名）、favicon、PWA 图标、iOS 启动图、logo 均已替换；保留上游 "Powered by" 与 GitHub 链接作开源合规署名。两份组件镜像**从 `vendor/` 里的修改后源码构建**（见下方「镜像版本锁定」与部署手册 §2），而非拉取上游官方镜像。品牌素材源在 `branding/`，生成脚本为 `scripts/gen-icons.cjs` 与 `scripts/gen-splash.cjs`；**重跑这两个脚本前需先 `npm install`**（仓库根 `package.json` 已声明 `opentype.js` / `@resvg/resvg-js` / `png-to-ico` 依赖，见 P8）。
 
 ## 快速开始
 

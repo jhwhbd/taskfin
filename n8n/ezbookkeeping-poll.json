@@ -24,7 +24,7 @@
         },
         "qsParameters": {
           "parameters": [
-            { "name": "count", "value": 20 }
+            { "name": "count", "value": 50 }
           ]
         }
       },
@@ -36,7 +36,7 @@
     },
     {
       "parameters": {
-        "functionCode": "// 过滤出评论里含 #vk-<任务ID> 或 #recur-<标识> 的交易。\n// P3：仅跳过「已成功处理」的交易（sd.lastIds）；处理失败的不入列，下次轮询自动重试。\nconst sd = $workflow.staticData;\nif (!sd.lastIds) sd.lastIds = [];\nconst items = $input.item.json.result || $input.item.json || {};\nconst txs = Array.isArray(items) ? items : (items.transactions || []);\nconst out = [];\nfor (const tx of txs) {\n  if (sd.lastIds.includes(tx.id)) continue; // 已成功处理 → 跳过\n  const comment = (tx.comment || '').toString();\n  const mv = comment.match(/#vk-(\\d+)/);\n  const mr = comment.match(/#recur-([\\w-]+)/);\n  if (mv) {\n    out.push({ json: { kind: 'vk', txId: tx.id, taskId: parseInt(mv[1], 10), comment: comment, amount: tx.sourceAmount, type: tx.type, time: tx.time } });\n  } else if (mr) {\n    out.push({ json: { kind: 'recur', txId: tx.id, token: '#recur-' + mr[1], comment: comment, amount: tx.sourceAmount, type: tx.type, time: tx.time } });\n  }\n}\nreturn out;"
+        "functionCode": "// 过滤出评论里含 #vk-<任务ID> 或 #recur-<标识> 的交易。\n// P3：仅跳过「已成功处理」的交易（sd.lastIds）；处理失败的不入列，下次轮询自动重试。\nconst sd = $workflow.staticData;\nif (!sd.lastIds) sd.lastIds = [];\nconst items = $input.item.json.result || $input.item.json || {};\nconst txs = Array.isArray(items) ? items : (items.transactions || []);\nconst out = [];\nfor (const tx of txs) {\n  if (sd.lastIds.includes(tx.id)) continue; // 已成功处理 → 跳过\n  const comment = (tx.comment || '').toString();\n  const mv = comment.match(/#vk-(\\d+)/);\n  const mr = comment.match(/#recur-([^#\\s]+)/);\n  if (mv) {\n    out.push({ json: { kind: 'vk', txId: tx.id, taskId: parseInt(mv[1], 10), comment: comment, amount: tx.sourceAmount, type: tx.type, time: tx.time } });\n  } else if (mr) {\n    out.push({ json: { kind: 'recur', txId: tx.id, token: '#recur-' + mr[1], comment: comment, amount: tx.sourceAmount, type: tx.type, time: tx.time } });\n  }\n}\nreturn out;"
       },
       "id": "b3",
       "name": "Filter #vk / #recur Transactions",
@@ -72,7 +72,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// P3：vk 分支回写评论成功后，才把 txId 记入 sd.lastIds（失败不记 → 重试）。\nconst sd = $workflow.staticData; if (!sd.lastIds) sd.lastIds = [];\nconst auth = 'Bearer ' + $vars.vikunja_token;\nconst base = 'http://vikunja:3456/api/v1';\ntry {\n  await this.helpers.httpRequest({\n    method: 'POST',\n    url: base + '/tasks/' + $json.taskId + '/comments',\n    headers: { Authorization: auth, 'Content-Type': 'application/json' },\n    json: true,\n    body: { comment: '财务侧记录已更新：' + $json.comment + '（交易ID ' + $json.txId + '）' }\n  });\n  sd.lastIds.push($json.txId); sd.lastIds = sd.lastIds.slice(-200);\n  return [{ json: { ...$json, processed: true } }];\n} catch (e) {\n  return [{ json: { ...$json, processed: false, error: (e && e.message) ? e.message : String(e) } }];\n}"
+        "jsCode": "// P3：vk 分支回写评论成功后，才把 txId 记入 sd.lastIds（失败不记 → 重试）。\nconst sd = $workflow.staticData; if (!sd.lastIds) sd.lastIds = [];\nconst auth = 'Bearer ' + $vars.vikunja_token;\nconst base = 'http://vikunja:3456/api/v1';\ntry {\n  await this.helpers.httpRequest({\n    method: 'POST',\n    url: base + '/tasks/' + $json.taskId + '/comments',\n    headers: { Authorization: auth, 'Content-Type': 'application/json' },\n    json: true,\n    body: { comment: '财务侧记录已更新：' + String($json.comment||'').slice(0,200) + '（交易ID ' + $json.txId + '）' }\n  });\n  sd.lastIds.push($json.txId); sd.lastIds = sd.lastIds.slice(-200);\n  return [{ json: { ...$json, processed: true } }];\n} catch (e) {\n  return [{ json: { ...$json, processed: false, error: (e && e.message) ? e.message : String(e) } }];\n}"
       },
       "id": "b4",
       "name": "Vikunja Comment Back",

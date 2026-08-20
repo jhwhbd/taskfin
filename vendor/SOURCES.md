@@ -28,6 +28,7 @@
 - **图标 / 启动图**：生成紫色（#6C5CE7）"T-FIN" SVG 并替换前后端 favicon、各尺寸图标；ezBookkeeping 42 张设备启动图（`vendor/ezbookkeeping/public/img/splash_screens/`）全部重绘为 TaskFIN 品牌。
 - **保留项**：上游 Powered by / GitHub 链接、事实性引用（如"导入到 Vikunja"）、版权与许可证署名均原样保留，以满足 AGPL-3.0 / MIT 合规。
 - **注意**：品牌化文件不计入 `scripts/check-vendor.sh` 的哈希校验（该脚本会跳过本地品牌文件）；上游前进并需重新 vendor 时，需在新快照上重做品牌化（或仅合并非品牌文件）。
+- **重跑品牌脚本的前置条件（P8）**：`scripts/gen-icons.cjs` 与 `scripts/gen-splash.cjs` 依赖 `opentype.js`、`@resvg/resvg-js`、`png-to-ico`，仓库根 `package.json` 已声明；重跑前需先 `npm install`（安装到本地 `node_modules`）。首次部署因品牌已烤进 vendor，可跳过；仅在上游升级重做品牌化时才需要。
 
 ## 如何更新到上游新版本
 

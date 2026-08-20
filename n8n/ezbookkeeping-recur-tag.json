@@ -1,0 +1,129 @@
+{
+  "name": "ezBookkeeping Recur Auto-Tag",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "cronExpression", "expression": "30 6 * * *" }
+          ]
+        }
+      },
+      "id": "rt0",
+      "name": "Schedule Daily 06:30",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [250, 200]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "recur-tag",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "rt1",
+      "name": "Manual Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 420],
+      "webhookId": "recur-tag"
+    },
+    {
+      "parameters": {
+        "functionCode": "// P1 防御：校验 webhook 静态密钥（?secret=）。失败直接丢弃。\nconst expected = (typeof $vars !== 'undefined' && $vars && $vars.webhook_secret) ? $vars.webhook_secret : '';\nconst q = ($input.item.json && $input.item.json.query) || {};\nconst got = q.secret || '';\nif (!(expected && got && got === expected)) {\n  return [];\n}\nreturn $input.all();"
+      },
+      "id": "rt1b",
+      "name": "Auth Guard (secret)",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [470, 420]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://ezbookkeeping:8080/api/v1/transaction/templates/list.json?templateType=2",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $vars.ezb_token }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "rt2",
+      "name": "List Scheduled Templates",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ezB 列表响应为 {success,result:[...]}，兼容直接返回数组的情况\nconst r = $input.first().json;\nconst list = Array.isArray(r) ? r : (r && r.result) || [];\nreturn (list || []).map(t => ({ json: t }));"
+      },
+      "id": "rt3",
+      "name": "Normalize List",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [920, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// P2 自动打标：对缺少 #recur-<标识> 的周期交易模板，按「模板名」推导标识并写入备注。\n// 约定：ezB 周期交易名称即 recur 标识（仅保留 中文/字母/数字/_/-），\n// 对应 Vikunja 任务的标签为 recur-<标识>（如 ezB 名「房贷01」→ 标签 recur-房贷01）。\n// 若备注已含 #recur-，则保留（用户自定义 / 已打标），不覆盖。\nconst out = [];\nfor (const t of $input.all()) {\n  const item = t.json;\n  const existing = (item.comment || '');\n  if (/#recur-[^#\\s]+/.test(existing)) continue; // 已打标，跳过\n  const name = (item.name || '').trim();\n  const token = name.replace(/[^\\p{L}\\p{N}_-]/gu, '');\n  if (!token) continue; // 无可用名称则跳过\n  const newComment = (existing ? existing + ' ' : '') + '#recur-' + token;\n  const comment = newComment.slice(0, 255); // ezB comment 上限 255\n  const body = {\n    id: String(item.id),\n    name: item.name,\n    type: item.type,\n    categoryId: String(item.categoryId),\n    sourceAccountId: String(item.sourceAccountId),\n    destinationAccountId: String(item.destinationAccountId || 0),\n    sourceAmount: item.sourceAmount,\n    destinationAmount: item.destinationAmount || 0,\n    hideAmount: !!item.hideAmount,\n    tagIds: item.tagIds || [],\n    comment: comment,\n    scheduledFrequencyType: item.scheduledFrequencyType,\n    scheduledFrequency: item.scheduledFrequency || null,\n    scheduledStartDate: item.scheduledStartDate || null,\n    scheduledEndDate: item.scheduledEndDate || null,\n    utcOffset: item.utcOffset\n  };\n  out.push({ json: { templateId: item.id, name: item.name, token: token, comment: comment, modifyBody: body } });\n}\nreturn out;"
+      },
+      "id": "rt4",
+      "name": "Plan Updates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1140, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://ezbookkeeping:8080/api/v1/transaction/templates/modify.json",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $vars.ezb_token }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "raw",
+        "body": "={{ JSON.stringify($json.modifyBody) }}",
+        "options": {}
+      },
+      "id": "rt5",
+      "name": "Update Template",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1360, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst tagged = items.map(i => ({ token: i.json.token, name: i.json.name, comment: i.json.comment }));\nreturn [{ json: { status: 'done', taggedCount: tagged.length, tagged: tagged } }];"
+      },
+      "id": "rt6",
+      "name": "Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1580, 300]
+    }
+  ],
+  "connections": {
+    "Schedule Daily 06:30": { "main": [ [ { "node": "List Scheduled Templates", "type": "main", "index": 0 } ] ] },
+    "Manual Webhook": { "main": [ [ { "node": "Auth Guard (secret)", "type": "main", "index": 0 } ] ] },
+    "Auth Guard (secret)": { "main": [ [ { "node": "List Scheduled Templates", "type": "main", "index": 0 } ] ] },
+    "List Scheduled Templates": { "main": [ [ { "node": "Normalize List", "type": "main", "index": 0 } ] ] },
+    "Normalize List": { "main": [ [ { "node": "Plan Updates", "type": "main", "index": 0 } ] ] },
+    "Plan Updates": { "main": [ [ { "node": "Update Template", "type": "main", "index": 0 } ] ] },
+    "Update Template": { "main": [ [ { "node": "Summary", "type": "main", "index": 0 } ] ] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false,
+  "versionId": "1",
+  "meta": { "instanceId": "local" },
+  "id": "ezbookkeeping-recur-tag"
+}

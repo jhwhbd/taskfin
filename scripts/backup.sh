@@ -50,16 +50,26 @@ docker exec vikunja sh -c "/app/vikunja/vikunja dump --path /backup" \
   || { echo "Vikunja dump 失败，退出"; exit 1; }
 
 # 2) ezBookkeeping 数据库文件
-echo "[2/4] 拷贝 ezBookkeeping 数据库 ..."
-cp -f "$PROJECT_DIR"/data/ezbookkeeping/data/*.db "$STAGING"/ 2>/dev/null \
-  || echo "  警告：未找到 ezB db 文件，跳过"
+# P4：ezB 默认用 WAL 模式，仅拷主库 *.db 会遗漏 -wal/-shm，且拷贝瞬间若有写入可能不一致。
+# 这里同时拷 db + -wal + -shm，保证快照一致（WAL 文件可能与主库同名前缀，不存在则跳过）。
+echo "[2/4] 拷贝 ezBookkeeping 数据库（含 WAL） ..."
+EZB_DATA="$PROJECT_DIR/data/ezbookkeeping/data"
+copied=0
+for f in ezbookkeeping.db ezbookkeeping.db-wal ezbookkeeping.db-shm; do
+  if [ -f "$EZB_DATA/$f" ]; then
+    cp -f "$EZB_DATA/$f" "$STAGING"/ && copied=$((copied+1))
+  fi
+done
+[ "$copied" -gt 0 ] || echo "  警告：未找到 ezB db 文件，跳过"
 
 # 3) ezBookkeeping 人读 CSV（可选）
+# P9：ezB 镜像未必自带 wget；优先 wget，缺失则回退 curl（均走容器内访问，因 ezB 未映射主机端口）。
+# 前置条件：ezB 需开启 EBK_DATA_ENABLE_EXPORT=true 且 EZB_TOKEN 已填，否则该步自动跳过。
 if [ "$EXPORT_CSV" = "1" ] && [ -n "$EZB_TOKEN" ]; then
   echo "[3/4] 导出 ezBookkeeping CSV（人读辅助）..."
-  docker exec ezbookkeeping sh -c "wget -qO- 'http://localhost:8080/api/data/export.csv?utcOffset=480' --header='Authorization: Bearer $EZB_TOKEN'" \
+  docker exec ezbookkeeping sh -c "(command -v wget >/dev/null 2>&1 && wget -qO- 'http://localhost:8080/api/data/export.csv?utcOffset=480' --header='Authorization: Bearer $EZB_TOKEN') || (command -v curl >/dev/null 2>&1 && curl -s -H 'Authorization: Bearer $EZB_TOKEN' 'http://localhost:8080/api/data/export.csv?utcOffset=480')" \
     > "$STAGING/ezbookkeeping.csv" 2>/dev/null \
-    || echo "  警告：CSV 导出失败，继续（不影响主备）"
+    || echo "  警告：CSV 导出失败（可能未开 EBK_DATA_ENABLE_EXPORT 或容器内无 wget/curl），继续（不影响主备）"
 else
   echo "[3/4] 跳过 CSV 导出（EXPORT_CSV=0 或未填 EZB_TOKEN）"
 fi
