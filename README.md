@@ -54,18 +54,21 @@ taskfin/
 │   ├── backup.sh           # 群晖任务计划用：全量备份 + 高压缩 + 仅留 3 份
 │   ├── init.sh             # 部署后初始化：Vikunja 建首管理员（幂等可重跑）
 │   └── check-vendor.sh     # 比对 vendor/ 上游源码哈希与 GitHub 最新提交
-├── n8n/                    # n8n 工作流导出（在 n8n 里 Import 即可）
+├── n8n/                    # n8n 工作流导出（在 n8n 里 Import from File 导入；默认均禁用，按需启用）
 │   ├── vikunja-task-sync.json          # 任务完成 → 记实际支出 → 回写
-│   ├── vikunja-budget-plan.json        # 任务新建 → 登计划支出（预算）
+│   ├── vikunja-budget-plan.json        # 任务新建 → 留「预算」评论（不记真实支出）
 │   ├── ezbookkeeping-poll.json         # 财务 → 任务（轮询回贴 + recur 自动勾掉）
 │   ├── ezbookkeeping-bill-reminder.json# 账单临期提醒模板（默认禁用，排除贷款）
+│   └── ezbookkeeping-recur-tag.json    # 周期交易自动打标（每日06:30+手动；默认禁用）
 ├── vendor/                 # 上游源码（已做品牌化改造，详见 vendor/SOURCES.md）
 │   ├── SOURCES.md          # 版本/许可证/更新方法
 │   ├── vikunja/            # AGPL-3.0（go-vikunja/vikunja 快照，已做品牌化改造）
 │   └── ezbookkeeping/      # MIT（mayswind/ezbookkeeping 快照，已做品牌化改造）
-└── docs/                   # 项目文档（两份）
+└── docs/                   # 项目文档（4 份）
     ├── 实施部署手册.md          # 可照做的部署步骤（DDNS/NPM/初始化/Webhook/n8n/备份/移动端 + 已知风险）
-    └── 项目介绍说明.md          # 项目定位、功能、架构、设计决策与当前状态
+    ├── 项目介绍说明.md          # 项目定位、功能、架构、设计决策与当前状态
+    ├── NAS构建与回滚.md         # NAS 实机构建前置检查、构建步骤与回滚方案
+    └── n8n变量清单.md           # n8n 变量速查（6 个 $vars.* 取值位置与 .env 映射）
 ```
 
 > ⚠️ 本项目为 **设计阶段完成、尚未实机部署** 的资料。所有结论基于文档调研，`n8n` 工作流 JSON 与部分参数需真机联调。
@@ -90,6 +93,12 @@ chown -R 1000:1000 data/ezbookkeeping/data data/ezbookkeeping/storage
 
 # 3. 启动
 docker compose up -d
+
+# 4. 导入 n8n 工作流（默认均禁用 active:false，按需手动 Enable）
+#   在 n8n 界面（flow.<域名> → Workflows → Import from File）逐个导入 n8n/*.json
+#   必开：vikunja-task-sync / vikunja-budget-plan / ezbookkeeping-poll
+#   选开：ezbookkeeping-bill-reminder（仅过滤、未接发送节点）、ezbookkeeping-recur-tag（每日06:30自动 + 手动 POST /recur-tag?secret=<webhook_secret>）
+#   另：ezBookkeeping 需在配置中开启 enable_scheduled_transaction=true（默认 false），否则周期交易无法建立、recur 闭环不工作
 ```
 
 启动后：
@@ -102,8 +111,9 @@ docker compose up -d
 ## 已知最高风险（部署前必读）
 
 1. **CalDAV 手机闹钟**：Vikunja 的 CalDAV 可能只同步事件、不导出 VALARM，手机可能不弹闹钟；可靠提醒仍是 QQ 邮件兜底。
-2. **n8n 四个 JSON 未实机校验**：`fund:` 标签解析、金额×100、`typeVersion`、Webhook 路径需在真机联调。
+2. **n8n 五个 JSON 未实机校验**：`fund:` 标签解析、金额×100、`typeVersion`、Webhook 路径需在真机联调。
 3. **确认备份共享子目录真实存在**：`scripts/backup.sh` 的 `SMB_DIR` 已锚定 `/volume1/share/taskfin_backup`，部署前请在 DSM「控制面板 → 共享文件夹」确认该子目录真实存在（否则脚本会因目录不存在而报错退出）。
+4. **n8n 共 5 个工作流**：核心 3 个（task-sync / budget-plan / poll）必开；`recur-tag` 默认禁用、每日 06:30 定时 + 手动 `POST /recur-tag?secret=<webhook_secret>` 触发（仅当使用「定期扣款」闭环时才需启用）；`bill-reminder` 默认禁用且当前模板未接发送节点、启用也不发邮件。所有流程的 webhook 密钥 `webhook_secret` 须与 §5.3 的 `WEBHOOK_SECRET` 及 Vikunja Webhook URL 里的 `?secret=` 保持一致。
 
 ## 镜像版本锁定
 
@@ -113,8 +123,8 @@ docker compose up -d
 |---|---|---|
 | Nginx Proxy Manager | jc21/nginx-proxy-manager | v2.15.1 |
 | ddns-go | jeessy/ddns-go | v6.17.5 |
-| Vikunja | vikunja/vikunja | v2.5.0 |
-| ezBookkeeping | mayswind/ezbookkeeping | v1.6.1 |
+| Vikunja | vikunja/vikunja | v2.5.0 | 从 `vendor/` 源码构建（版本仅记录，compose 不再拉此镜像） |
+| ezBookkeeping | mayswind/ezbookkeeping | v1.6.1 | 从 `vendor/` 源码构建（版本仅记录，compose 不再拉此镜像） |
 | n8n | n8nio/n8n | 1.123.72 |
 
 > ⚠️ n8n 的 Docker tag **不带 v 前缀**（`1.123.72` 而非 `v1.123.72`），与其余服务不同，注意区分。
