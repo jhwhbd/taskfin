@@ -12,7 +12,7 @@
 #   - Vikunja 网页「设置 → API Tokens」新建 token，填 n8n 变量 vikunja_token
 #   - ezBookkeeping 网页注册账号、建「现金/存款」账户、建支出/贷款分类、
 #     生成 API Token，填 n8n 变量 ezb_*（见 docs/实施部署手册.md §5.2 / §5.3）
-#   - n8n 网页 Import 四个工作流 JSON（n8n/*.json）
+#   - n8n 网页 Import 五个工作流 JSON（n8n/*.json）
 #
 # 用法（环境变量或位置参数均可）：
 #   EZB_ADMIN_EMAIL="你@qq.com" EZB_ADMIN_PASS="强密码" \
@@ -85,7 +85,7 @@ echo "接下来请人工完成（网页）："
 echo "  1. Vikunja 设置→API Tokens 新建，填 n8n 变量 vikunja_token"
 echo "  2. ezBookkeeping 注册/建账户/建分类/生成 Token，填 n8n 变量 ezb_*"
 echo "     （公开注册已由 compose 默认关闭，无需额外 CLI 操作）"
-echo "  3. n8n 导入 n8n/*.json 四个工作流"
+echo "  3. n8n 导入 n8n/*.json 五个工作流"
 
 # ---------- 灾难恢复（非初始化，按需手动执行，见 docs/实施部署手册.md §9.2） ----------
 # Vikunja 还原：把备份 zip 放进 data/backup_staging/ 后执行：

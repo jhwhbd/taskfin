@@ -3,13 +3,23 @@
   "nodes": [
     {
       "parameters": {
-        "rule": { "interval": [ { "field": "minutes", "minutesInterval": 5 } ] }
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
       },
       "id": "b1",
       "name": "Every 5 min",
       "type": "n8n-nodes-base.cron",
       "typeVersion": 2,
-      "position": [250, 300]
+      "position": [
+        250,
+        300
+      ]
     },
     {
       "parameters": {
@@ -18,13 +28,22 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "=Bearer {{ $vars.ezb_token }}" },
-            { "name": "X-Timezone-Name", "value": "Asia/Shanghai" }
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $vars.ezb_token }}"
+            },
+            {
+              "name": "X-Timezone-Name",
+              "value": "Asia/Shanghai"
+            }
           ]
         },
         "qsParameters": {
           "parameters": [
-            { "name": "count", "value": 50 }
+            {
+              "name": "count",
+              "value": 50
+            }
           ]
         }
       },
@@ -32,7 +51,10 @@
       "name": "ezB List Transactions",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [480, 300]
+      "position": [
+        480,
+        300
+      ]
     },
     {
       "parameters": {
@@ -42,15 +64,27 @@
       "name": "Filter #vk / #recur Transactions",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [710, 300]
+      "position": [
+        710,
+        300
+      ]
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true },
+          "options": {
+            "caseSensitive": true
+          },
           "combinator": "and",
           "conditions": [
-            { "leftValue": "={{ $json.kind }}", "rightValue": "recur", "operator": { "type": "string", "operation": "equals" } }
+            {
+              "leftValue": "={{ $json.kind }}",
+              "rightValue": "recur",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
           ]
         }
       },
@@ -58,7 +92,10 @@
       "name": "Split vk / recur",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [710, 470]
+      "position": [
+        710,
+        470
+      ]
     },
     {
       "parameters": {
@@ -68,48 +105,111 @@
       "name": "Resolve & Complete Recur",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [950, 360]
+      "position": [
+        950,
+        360
+      ]
     },
     {
       "parameters": {
-        "jsCode": "// P3：vk 分支回写评论成功后，才把 txId 记入 sd.lastIds（失败不记 → 重试）。\nconst sd = $workflow.staticData; if (!sd.lastIds) sd.lastIds = [];\nconst auth = 'Bearer ' + $vars.vikunja_token;\nconst base = 'http://vikunja:3456/api/v1';\ntry {\n  await this.helpers.httpRequest({\n    method: 'POST',\n    url: base + '/tasks/' + $json.taskId + '/comments',\n    headers: { Authorization: auth, 'Content-Type': 'application/json' },\n    json: true,\n    body: { comment: '财务侧记录已更新：' + String($json.comment||'').slice(0,200) + '（交易ID ' + $json.txId + '）' }\n  });\n  sd.lastIds.push($json.txId); sd.lastIds = sd.lastIds.slice(-200);\n  return [{ json: { ...$json, processed: true } }];\n} catch (e) {\n  return [{ json: { ...$json, processed: false, error: (e && e.message) ? e.message : String(e) } }];\n}"
+        "jsCode": "// P3：vk 分支回写评论成功后，才把 txId 记入 sd.lastIds（失败不记 → 重试）。\n// K（幂等护栏）：n8n 重启会清空内存中的 staticData.lastIds，故回写前先查本任务评论，\n//    若已含本交易回执（含 \"交易ID <txId>\"）则跳过，避免重启后重复发评论（持久化于 Vikunja）。\nconst sd = $workflow.staticData; if (!sd.lastIds) sd.lastIds = [];\nconst auth = 'Bearer ' + $vars.vikunja_token;\nconst base = 'http://vikunja:3456/api/v1';\nconst txId = $json.txId;\ntry {\n  const cResp = await this.helpers.httpRequest({\n    method: 'GET',\n    url: base + '/tasks/' + $json.taskId + '/comments',\n    headers: { Authorization: auth, 'Content-Type': 'application/json' },\n    json: true\n  });\n  const comments = Array.isArray(cResp) ? cResp : (cResp.comments || []);\n  const re = new RegExp('交易ID\\\\s*' + String(txId));\n  if (comments.some(c => re.test(c.comment || c.text || ''))) {\n    sd.lastIds.push(txId); sd.lastIds = sd.lastIds.slice(-200);\n    return [{ json: { ...$json, processed: true, skipped: true, note: '评论已存在，幂等跳过（重启后护栏）' } }];\n  }\n  await this.helpers.httpRequest({\n    method: 'POST',\n    url: base + '/tasks/' + $json.taskId + '/comments',\n    headers: { Authorization: auth, 'Content-Type': 'application/json' },\n    json: true,\n    body: { comment: '财务侧记录已更新：' + String($json.comment||'').slice(0,200) + '（交易ID ' + txId + '）' }\n  });\n  sd.lastIds.push(txId); sd.lastIds = sd.lastIds.slice(-200);\n  return [{ json: { ...$json, processed: true } }];\n} catch (e) {\n  return [{ json: { ...$json, processed: false, error: (e && e.message) ? e.message : String(e) } }];\n}"
       },
       "id": "b4",
       "name": "Vikunja Comment Back",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [950, 560]
+      "position": [
+        950,
+        560
+      ]
     },
     {
       "parameters": {
-        "notice": "【recur 自动勾掉闭环】\n本工作流每 5 分钟拉取 ezB 近期交易：\n• 评论含 #vk-<任务ID> → 在对应 Vikunja 任务回写「财务侧记录已更新」评论（普通任务记账回执）。\n• 评论含 #recur-<标识> → 调 Vikunja API 找出「带 recur 标签 + 同名 #recur-<标识> 标签 + 未完成」的那一笔 recurring 任务，POST /tasks/{id} 置 done=true，并回写「by:ezB周期交易 已扣款」评论，实现「财务真扣了 → 任务记录完成」。\n\n⚠️ Vikunja 重复任务完成语义（见文档 §5.6C / B6）：重复任务不生成新实例，被标完成会原生重置为未完成并顺延到期日（源码 setTaskDates* 均把 Done 置回 false）；但 done_at 时间戳 + 回写评论会被持久记录，poll 跨月稳定命中同一任务。\n⚠️ 只需 setup 时给 recur 任务一次性打上 recur + #recur-<标识> 两标签即可。\n⚠️ 依赖 B2：节点 typeVersion（cron 2 / httpRequest 4.2 / code 2 / if 2）需与所装 n8n 版本匹配。\n\n【可靠性修复】\n• P3：sd.lastIds 仅在「处理成功」后写入（vk 回写成功 / recur 标完成成功）；失败不入列 → 下次轮询自动重试，闭环不再静默失效。\n• P4：同周期重复扣款护栏——回写评论带交易时间，若本任务已有「已扣款」评论且记录时间 ≥ 本次交易时间，判定本周期已处理并跳过，避免重复勾选。",
+        "notice": "【recur 自动勾掉闭环】\n本工作流每 5 分钟拉取 ezB 近期交易：\n• 评论含 #vk-<任务ID> → 在对应 Vikunja 任务回写「财务侧记录已更新」评论（普通任务记账回执）。\n• 评论含 #recur-<标识> → 调 Vikunja API 找出「带 recur 标签 + 同名 #recur-<标识> 标签 + 未完成」的那一笔 recurring 任务，POST /tasks/{id} 置 done=true，并回写「by:ezB周期交易 已扣款」评论，实现「财务真扣了 → 任务记录完成」。\n\n⚠️ Vikunja 重复任务完成语义（见文档 §5.6C / B6）：重复任务不生成新实例，被标完成会原生重置为未完成并顺延到期日（源码 setTaskDates* 均把 Done 置回 false）；但 done_at 时间戳 + 回写评论会被持久记录，poll 跨月稳定命中同一任务。\n⚠️ 只需 setup 时给 recur 任务一次性打上 recur + #recur-<标识> 两标签即可。\n⚠️ 依赖 B2：节点 typeVersion（cron 2 / httpRequest 4.2 / code 2 / if 2）需与所装 n8n 版本匹配。\n\n【可靠性修复】\n• P3：sd.lastIds 仅在「处理成功」后写入（vk 回写成功 / recur 标完成成功）；失败不入列 → 下次轮询自动重试，闭环不再静默失效。\n• P4：同周期重复扣款护栏——回写评论带交易时间，若本任务已有「已扣款」评论且记录时间 ≥ 本次交易时间，判定本周期已处理并跳过，避免重复勾选。\\n• K：vk 回写增加持久化幂等护栏（回写前先查任务评论是否已含本交易ID，避免 n8n 重启清空 staticData.lastIds 后重复发评论）。",
         "notesInFlow": true
       },
       "id": "b7",
       "name": "说明(Sticky)",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [250, 470],
+      "position": [
+        250,
+        470
+      ],
       "width": 460,
       "height": 320
     }
   ],
   "connections": {
-    "Every 5 min": { "main": [ [ { "node": "ezB List Transactions", "type": "main", "index": 0 } ] ] },
-    "ezB List Transactions": { "main": [ [ { "node": "Filter #vk / #recur Transactions", "type": "main", "index": 0 } ] ] },
-    "Filter #vk / #recur Transactions": { "main": [ [ { "node": "Split vk / recur", "type": "main", "index": 0 } ] ] },
-    "Split vk / recur": {
+    "Every 5 min": {
       "main": [
-        [ { "node": "Resolve & Complete Recur", "type": "main", "index": 0 } ],
-        [ { "node": "Vikunja Comment Back", "type": "main", "index": 0 } ]
+        [
+          {
+            "node": "ezB List Transactions",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
-    "Vikunja Comment Back": { "main": [ [] ] },
-    "Resolve & Complete Recur": { "main": [ [] ] }
+    "ezB List Transactions": {
+      "main": [
+        [
+          {
+            "node": "Filter #vk / #recur Transactions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter #vk / #recur Transactions": {
+      "main": [
+        [
+          {
+            "node": "Split vk / recur",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split vk / recur": {
+      "main": [
+        [
+          {
+            "node": "Resolve & Complete Recur",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Vikunja Comment Back",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vikunja Comment Back": {
+      "main": [
+        []
+      ]
+    },
+    "Resolve & Complete Recur": {
+      "main": [
+        []
+      ]
+    }
   },
-  "settings": { "executionOrder": "v1" },
+  "settings": {
+    "executionOrder": "v1"
+  },
   "active": false,
   "versionId": "1",
-  "meta": { "instanceId": "local" },
+  "meta": {
+    "instanceId": "local"
+  },
   "id": "ezbookkeeping-poll"
 }

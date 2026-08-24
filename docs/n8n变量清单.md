@@ -6,7 +6,7 @@
 
 | n8n 变量名 | 配置位置 | 取值 | 用途 | 使用的工作流 |
 |---|---|---|---|---|
-| `webhook_secret` | n8n `Settings → Variables` | 随机串（建议 `openssl rand -base64 24`） | P1 静态密钥校验：Webhook 节点比对 `?secret=`，不符直接丢弃 | task-sync / budget-plan / recur-tag |
+| `webhook_secret` | n8n `Settings → Variables` | 随机串（建议 `openssl rand -hex 16`） | P1 静态密钥校验：Webhook 节点比对 `?secret=`，不符直接丢弃 | task-sync / budget-plan / recur-tag |
 | `ezb_token` | n8n `Settings → Variables` | ezBookkeeping 用户的 API Token（网页「设置 → 令牌」生成） | `Authorization: Bearer` 调用 ezB API | task-sync / poll / recur-tag / bill-reminder |
 | `vikunja_token` | n8n `Settings → Variables` | Vikunja 用户的 API Token（网页「设置 → 令牌」生成） | `Authorization: Bearer` 调用 Vikunja API | task-sync / budget-plan |
 | `ezb_cat_expense` | n8n `Settings → Variables` | ezB 支出分类 ID（**字符串**，如 `"1"`） | task-sync 建账时填 `categoryId`（见下方注意） | task-sync |

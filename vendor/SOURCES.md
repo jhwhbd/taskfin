@@ -46,4 +46,12 @@ rm -rf /tmp/ezb/.git
 rm -rf vendor/ezbookkeeping && cp -r /tmp/ezb vendor/ezbookkeeping
 ```
 
+> ⚠️ **覆盖 `vendor/` 会清除 TaskFIN 品牌化文件**（图标 / favicon / 启动图 / 名称）。拉取新版后必须**重做品牌化**，否则界面恢复上游原厂名 / 图标。前置：`npm install`（安装 `gen-icons.cjs` / `gen-splash.cjs` 依赖，见上方「TaskFIN 品牌化改造清单」P8 注），然后在本仓库根目录执行：
+> ```bash
+> node scripts/gen-icons.cjs      # 重新生成并铺图标/favicon/logo 到 vendor/（Vikunja + ezBookkeeping）
+> node scripts/gen-splash.cjs     # 重新生成 42 张 ezB 启动图为 TaskFIN 品牌
+> # 名称字符串（Vikunja/ezB 各语言文件、后端 ApplicationName 等）需按上游变动重新 grep 替换（位置见 README「品牌化」段）
+> ```
+> 若仅合并非品牌文件可跳过重做，但本快照为整目录覆盖，通常**需要**重做品牌化。
+
 更新后请同步修改本文件中的 commit 哈希与日期。

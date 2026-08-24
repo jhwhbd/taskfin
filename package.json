@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "TaskFIN 自托管方案（Vikunja + ezBookkeeping + n8n）。本 package.json 仅用于声明品牌生成脚本的依赖（gen-icons.cjs / gen-splash.cjs），不含运行时依赖。",
-  "license": "AGPL-3.0",
+  "license": "MIT",
   "scripts": {
     "gen-icons": "node scripts/gen-icons.cjs",
     "gen-splash": "node scripts/gen-splash.cjs"

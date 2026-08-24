@@ -139,5 +139,5 @@ services:
 #          data/vikunja/files data/vikunja/db \
 #          data/ezbookkeeping/data data/ezbookkeeping/storage \
 #          data/n8n data/backup_staging
-# chown -R 1000:1000 data/ezbookkeeping/data data/ezbookkeeping/storage
+# chown -R 1000:1000 data/ezbookkeeping/data data/ezbookkeeping/storage data/vikunja/files data/vikunja/db
 # docker compose up -d

@@ -64,10 +64,11 @@ taskfin/
 │   ├── SOURCES.md          # 版本/许可证/更新方法
 │   ├── vikunja/            # AGPL-3.0（go-vikunja/vikunja 快照，已做品牌化改造）
 │   └── ezbookkeeping/      # MIT（mayswind/ezbookkeeping 快照，已做品牌化改造）
-└── docs/                   # 项目文档（4 份）
+└── docs/                   # 项目文档（5 份）
     ├── 实施部署手册.md          # 可照做的部署步骤（DDNS/NPM/初始化/Webhook/n8n/备份/移动端 + 已知风险）
     ├── 项目介绍说明.md          # 项目定位、功能、架构、设计决策与当前状态
     ├── NAS构建与回滚.md         # NAS 实机构建前置检查、构建步骤与回滚方案
+    ├── 家庭功能增强方案.md      # 家庭场景功能增强设计（提案·未实现）
     └── n8n变量清单.md           # n8n 变量速查（6 个 $vars.* 取值位置与 .env 映射）
 ```
 
@@ -89,7 +90,7 @@ mkdir -p data/npm/data data/npm/letsencrypt data/ddns-go \
          data/vikunja/files data/vikunja/db \
          data/ezbookkeeping/data data/ezbookkeeping/storage \
          data/n8n data/backup_staging
-chown -R 1000:1000 data/ezbookkeeping/data data/ezbookkeeping/storage
+chown -R 1000:1000 data/ezbookkeeping/data data/ezbookkeeping/storage data/vikunja/files data/vikunja/db
 
 # 3. 启动
 docker compose up -d

@@ -9,12 +9,14 @@
 #   5. 写入群晖 Windows 共享文件夹 taskfin_backup
 #   6. 仅保留最近 3 份
 # 用法：群晖「控制面板 -> 任务计划 -> 用户自定义脚本」每周日 03:00 执行
-#       bash /volume1/docker/taskfin/scripts/backup.sh
+#       bash /path/to/taskfin/scripts/backup.sh   # 路径按脚本实际位置自动推导，无需硬编码
 # =============================================================
 set -euo pipefail
 
 # ---------- 可配置区（按你环境修改） ----------
-PROJECT_DIR="/volume1/docker/taskfin"          # compose 项目目录
+# PROJECT_DIR 由脚本位置自动推导（脚本位于 <项目>/scripts/ 下），部署路径变更无需改这里。
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"     # compose 项目目录（自动推导）
 STAGING="$PROJECT_DIR/data/backup_staging"     # 临时落盘目录（已挂进 vikunja 容器 /backup；注意：与 compose 卷 ./data/backup_staging 对应，含 data/ 前缀）
 # 备份写入目标：本机群晖共享文件夹的真实绝对路径。
 # 群晖共享文件夹在文件系统内的真实路径为 /volume1/<共享名>/<子目录>，
