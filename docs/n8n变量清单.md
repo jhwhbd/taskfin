@@ -12,6 +12,7 @@
 | `ezb_cat_expense` | n8n `Settings → Variables` | ezB 支出分类 ID（**字符串**，如 `"1"`） | task-sync 建账时填 `categoryId`（见下方注意） | task-sync |
 | `ezb_account_cash_id` | n8n `Settings → Variables` | ezB 现金账户 ID（**字符串**） | `fund:...:cash` 任务记账的目标账户 `sourceAccountId` | task-sync |
 | `ezb_account_deposit_id` | n8n `Settings → Variables` | ezB 存款账户 ID（**字符串**） | `fund:...:deposit` 任务记账的目标账户 `sourceAccountId` | task-sync |
+| `ezb_cat_loan` | n8n `Settings → Variables` | ezB 贷款还款分类 ID（**字符串**，如 `"3"`） | `ezbookkeeping-bill-reminder` 引用 `{{ $vars.ezb_cat_loan }}` 识别「贷款还款」分类 | bill-reminder |
 
 > ⚠️ **ID 字段必须按字符串发送**：ezB 源码中 `categoryId`、`sourceAccountId` 绑定为 `,string`（`json:"categoryId,string"`）。在 n8n 变量里填数字会被当成 JSON number 导致绑定失败（400）。务必填带引号的字符串（如 `"1"`）；当前流程用 `={{ $vars.xxx }}` 表达式，n8n 通常会以字符串发送，但若在变量 UI 里直接填了纯数字仍可能踩坑——请填字符串形式。
 
@@ -20,6 +21,7 @@
 | 概念 | `.env` 项 | 说明 |
 |---|---|---|
 | Webhook 密钥 | `WEBHOOK_SECRET` | 该值与上面的 n8n `webhook_secret` **必须是同一个串**；同时 Vikunja 里两个 Webhook 的 Target URL 末尾要补 `?secret=<同一值>`（见 `docs/实施部署手册.md` §6）。三处不一致会导致新 Auth Guard 丢弃所有请求、桥接停摆。 |
+> ⚠️ **`WEBHOOK_SECRET` 仅由文档约束、不被 compose 消费**：`.env` 的 `WEBHOOK_SECRET` 在 `docker-compose.yml` 中无任何服务引用（不会注入容器环境变量），仅靠「本值 = n8n `webhook_secret` = Vikunja 两个 Webhook URL 末尾 `?secret=`」三处一致来生效，compose 层无强制校验。部署时务必人工核对三处一致，否则桥接停摆。 |
 | ezB 用户令牌 | （无独立 `.env` 项） | ezB API Token 直接在 n8n `ezb_token` 填，不从 `.env` 读取。 |
 | Vikunja 用户令牌 | （无独立 `.env` 项） | 同上，填 n8n `vikunja_token`。 |
 
@@ -28,7 +30,7 @@
 ## 三、填写顺序建议
 
 1. 在 ezB / Vikunja 网页各生成一个 API Token。
-2. n8n `Settings → Variables` 新建上述 6 个变量，粘贴对应值（ID 类按字符串填）。
+2. n8n `Settings → Variables` 新建上述 7 个变量，粘贴对应值（ID 类按字符串填）。
 3. 生成 `webhook_secret` 随机串，同时写入 n8n `webhook_secret` 与 `.env` 的 `WEBHOOK_SECRET`，并补到两个 Vikunja Webhook URL 末尾。
 4. 导入 5 个 `n8n/*.json`，按需要 Enable（核心 3 个必开；recur-tag / bill-reminder 按需）。
 5. 逐步联调（见手册 §B2）：先手动「执行工作流」跑通，再启用 Webhook / 定时。
@@ -37,5 +39,5 @@
 
 使用「定期扣款」闭环（`recur-tag` + `poll` 回写）前，必须开启 ezB 的周期交易功能：
 
-- 配置项：`enable_scheduled_transaction = true`（默认 `false`；具体环境变量名以你所装 ezB 版本为准，可在 ezB 配置文件或环境变量中设置）。
+- 配置项：`enable_scheduled_transaction`（位于 `[user]` 段）。**正确环境变量名：`EBK_USER_ENABLE_SCHEDULED_TRANSACTION`**（拼接规则 `EBK_<段>_<键>`；旧文档曾误作 `EBK_SCHEDULED_TRANSACTION_ENABLED`）。本仓库 vendored 快照的 `conf/ezbookkeeping.ini` 已默认 `true`、镜像 `Dockerfile` 铺入 conf，故默认已开启；`docker-compose.yml` 也已显式声明 `EBK_USER_ENABLE_SCHEDULED_TRANSACTION=true` 以不依赖 ini 默认值。
 - 未开启则周期交易无法建立、不会自动过账，整个 recur 闭环不工作。

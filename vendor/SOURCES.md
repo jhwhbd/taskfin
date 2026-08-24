@@ -2,7 +2,7 @@
 
 本目录收录本项目依赖的两个上游开源项目的**完整源代码快照**，目的是在万一上游仓库关闭或不可达时，本项目仍可自包含地构建、部署与维护，不依赖外部托管。
 
-## 收录清单（vendor 于 2026-08-18 刷新至上游最新 main）
+## 收录清单（vendor 当前实际快照：2026-08-18 拉取自上游 main；上游截至 2026-08-24 最新见下方「上游最新核实」）
 
 ### Vikunja
 - 上游仓库：<https://github.com/go-vikunja/vikunja>
@@ -15,6 +15,12 @@
 - 许可证：**MIT**（宽松，全文见 `vendor/ezbookkeeping/LICENSE`）
 - Vendor 版本：`0461abcc94b5f7e337d4736bc6f52d77ab238deb`（2026-08-18 00:28 北京时间，main 最新提交）
 - 说明：轻量自托管个人记账应用（Go + TypeScript/Vue）。本快照为 shallow clone 去除 `.git` 后的纯源码，**已做 TaskFIN 品牌化改造**（名称/图标/启动图/多语言/部分后端文案，详见下方「品牌化改造清单」）。
+
+### 上游最新核实（2026-08-24 经 `git ls-remote` 核实，尚未同步进本 vendor/）
+- **Vikunja** 上游 main 最新提交：`d6c3d8e77efb7dac6f8027e38f1f1b39b4c8d336`
+- **ezBookkeeping** 上游 main 最新提交：`4d98122f10e80ef23c11d25a61c4e625c3757208`
+
+> ⚠️ 本 `vendor/` 当前仍是 2026-08-18 的快照（上方「收录清单」哈希），**尚未推进到上述最新**。原因：本开发沙箱无 Docker、无法在本地验证 re-vendor 后的镜像能否构建；且沙箱的安全删除机制会拦截对大目录的 `rm -rf`，不宜在本地整体覆盖 `vendor/`。**建议在本项目的 NAS 构建机上执行 re-vendor**（见下方「如何更新到上游新版本」），重做品牌化后再 `docker compose build`。本仓库已随本次提交在 `.gitignore` 中忽略 `.vendor-bak/` 与 `.reclone/` 两个临时目录（re-vendor 前的备份与上游临时克隆），避免误提交。
 
 ## 许可证与合规义务
 
@@ -31,6 +37,8 @@
 - **重跑品牌脚本的前置条件（P8）**：`scripts/gen-icons.cjs` 与 `scripts/gen-splash.cjs` 依赖 `opentype.js`、`@resvg/resvg-js`、`png-to-ico`，仓库根 `package.json` 已声明；重跑前需先 `npm install`（安装到本地 `node_modules`）。首次部署因品牌已烤进 vendor，可跳过；仅在上游升级重做品牌化时才需要。
 
 ## 如何更新到上游新版本
+
+> 💡 **执行环境**：建议在 NAS 构建机（已装 Docker、可对 `vendor/` 自由 `rm -rf`、可验证构建）上执行。若在受限沙箱（无 Docker、且禁止对大目录批量删除）中操作，请勿直接 `rm -rf vendor/*`——改为 `cp -r` 覆盖后用 `git add -A vendor/` 让 Git 自动记录文件增删，避免触发安全拦截，也不会丢失品牌化之外的已跟踪文件。无论何种环境，覆盖后都必须**重做品牌化**（见上方「TaskFIN 品牌化改造清单」P8 注）。
 
 若需同步上游更新，重新拉取并覆盖即可（保留 `.git` 仅用于取最新，取完即删）：
 

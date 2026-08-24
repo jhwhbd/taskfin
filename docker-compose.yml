@@ -109,11 +109,14 @@ services:
       EBK_SERVER_ENABLE_GZIP: "true"
       # 数据导出开关（备份工作流 GET /api/data/export.csv 依赖此开关）
       EBK_DATA_ENABLE_EXPORT: "true"
+      # 周期/计划交易（定期扣款闭环）开关：位于 [user] 段，变量名 EBK_USER_ENABLE_SCHEDULED_TRANSACTION
+      # （拼接规则 EBK_<段>_<键>）；本快照 ini 已默认 true，此处显式声明使行为确定、不依赖 ini 默认值
+      EBK_USER_ENABLE_SCHEDULED_TRANSACTION: "true"
     restart: unless-stopped
     networks: [appnet]
 
   # ---- 自动化桥接 n8n（不发布主机端口）----
-  # depends_on: n8n 桥接依赖 Vikunja/ezB 就绪；首次启动 n8n 可能先于上游，手动重跑触发器即可。
+  # 启动顺序：下方 depends_on 已声明依赖 vikunja / ezbookkeeping（见下方块，已生效、非注释）。首次启动 n8n 可能暂先于上游就绪，手动重跑一次触发器即可。
   n8n:
     image: n8nio/n8n:${N8N_VERSION}
     container_name: n8n

@@ -24,3 +24,9 @@ docs/本轮AI修改记录.md
 
 # ===== 临时分析脚本（不入库）=====
 scripts/_*.cjs
+
+# ===== re-vendor 过程临时产物（不入库）=====
+# .vendor-bak/  : 品牌化 vendor/ 的临时备份（re-vendor 前生成，回滚用）
+# .reclone/     : 上游最新 main 的临时克隆（git ls-remote / 构建机 re-vendor 用）
+.vendor-bak/
+.reclone/
