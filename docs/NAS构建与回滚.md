@@ -91,7 +91,7 @@ docker compose up -d        # 会拉取官方镜像（需外网）
 
 1. 浏览器打开 `https://tasks.<你的域名>` → 标签/页内标题应为 **TaskFIN**，favicon 为紫色 T-FIN。
 2. 打开 `https://fin.<你的域名>` → 同上。
-3. 移动端「添加到主屏幕」→ 主屏图标为 TaskFIN；iOS 启动图为白底 T-FIN。
+3. 移动端「添加到主屏幕」→ 主屏图标为 TaskFIN；iOS 启动图为白底 TaskFIN（启动图标签由 scripts/gen-splash.cjs 渲染为 "TaskFIN"，与图标缩写 "T-FIN" 不同，属刻意设计）。
 4. 注册/登录后任意非英语语言界面，应用名仍为 TaskFIN（已改全部语言 token）。
 5. 触发一封系统邮件（如密码重置）→ 发件人显示名应为 TaskFIN。
 

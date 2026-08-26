@@ -55,7 +55,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// P2 防重发护栏：若任务评论里已有「已自动记账」回执（含 #vk-<taskId>），说明本次/历史已完成真实记账，\n// 跳过，避免编辑已完成任务、或取消完成后再完成导致重复记 type=3 真实支出。\nconst taskId = $json.taskId;\nconst auth = 'Bearer ' + $vars.vikunja_token;\nconst base = 'http://vikunja:3456/api/v1';\ntry {\n  const resp = await this.helpers.httpRequest({ method:'GET', url: base + '/tasks/' + taskId + '/comments', headers:{Authorization:auth,'Content-Type':'application/json'}, json:true });\n  const comments = Array.isArray(resp) ? resp : (resp.comments || []);\n  const marker = '#vk-' + taskId;\n  const already = comments.some(c => { const t = (c.comment || c.text || ''); return t.includes('已自动记账到 ezBookkeeping') || t.includes(marker); });\n  return [{ json: { ...$json, alreadyAccounted: already } }];\n} catch (e) {\n  // 取评论失败：保守放行（仍记账），避免漏记真实支出；异常仅记录\n  return [{ json: { ...$json, alreadyAccounted: false, commentCheckError: (e && e.message) ? e.message : String(e) } }];\n}"
+        "jsCode": "// P2 防重发护栏：若任务评论里已有「已自动记账」回执（含 #auto-<taskId>），说明本次/历史已完成真实记账，\n// 跳过，避免编辑已完成任务、或取消完成后再完成导致重复记 type=3 真实支出。\nconst taskId = $json.taskId;\nconst auth = 'Bearer ' + $vars.vikunja_token;\nconst base = 'http://vikunja:3456/api/v1';\ntry {\n  const resp = await this.helpers.httpRequest({ method:'GET', url: base + '/tasks/' + taskId + '/comments', headers:{Authorization:auth,'Content-Type':'application/json'}, json:true });\n  const comments = Array.isArray(resp) ? resp : (resp.comments || []);\n  const marker = '#auto-' + taskId;\n  const already = comments.some(c => { const t = (c.comment || c.text || ''); return t.includes('已自动记账到 ezBookkeeping') || t.includes(marker); });\n  return [{ json: { ...$json, alreadyAccounted: already } }];\n} catch (e) {\n  // 取评论失败：保守放行（仍记账），避免漏记真实支出；异常仅记录\n  return [{ json: { ...$json, alreadyAccounted: false, commentCheckError: (e && e.message) ? e.message : String(e) } }];\n}"
       },
       "id": "a3b",
       "name": "Check Accounted",
@@ -101,7 +101,7 @@
             { "name": "utcOffset", "value": 480 },
             { "name": "sourceAccountId", "value": "={{ $json.fund_account === 'deposit' ? $vars.ezb_account_deposit_id : $vars.ezb_account_cash_id }}" },
             { "name": "sourceAmount", "value": "={{ Math.round($json.fund_amount * 100) }}" },
-            { "name": "comment", "value": "=任务完成记账: {{ String($json.title||'').slice(0,200) }} #vk-{{ $json.taskId }}" }
+            { "name": "comment", "value": "=任务完成记账: {{ String($json.title||'').slice(0,200) }} #auto-{{ $json.taskId }}" }
           ]
         }
       },
@@ -126,7 +126,7 @@
         "contentType": "json",
         "bodyParameters": {
           "parameters": [
-            { "name": "comment", "value": "=已自动记账到 ezBookkeeping：支出 ¥{{ $json.fund_amount }}（交易评论含 #vk-{{ $json.taskId }}）" }
+            { "name": "comment", "value": "=已自动记账到 ezBookkeeping：支出 ¥{{ $json.fund_amount }}（交易评论含 #auto-{{ $json.taskId }}）" }
           ]
         }
       },

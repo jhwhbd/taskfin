@@ -90,7 +90,7 @@ mkdir -p data/npm/data data/npm/letsencrypt data/ddns-go \
          data/vikunja/files data/vikunja/db \
          data/ezbookkeeping/data data/ezbookkeeping/storage \
          data/n8n data/backup_staging
-chown -R 1000:1000 data/ezbookkeeping/data data/ezbookkeeping/storage data/vikunja/files data/vikunja/db
+chown -R 1000:1000 data/ezbookkeeping/data data/ezbookkeeping/storage data/vikunja/files data/vikunja/db data/n8n data/backup_staging
 
 # 3. 启动
 docker compose up -d
@@ -99,8 +99,10 @@ docker compose up -d
 #   在 n8n 界面（flow.<域名> → Workflows → Import from File）逐个导入 n8n/*.json
 #   必开：vikunja-task-sync / vikunja-budget-plan / ezbookkeeping-poll
 #   选开：ezbookkeeping-bill-reminder（仅过滤、未接发送节点）、ezbookkeeping-recur-tag（每日06:30自动 + 手动 POST /recur-tag?secret=<webhook_secret>）
-#   另：ezBookkeeping 需在配置中开启 enable_scheduled_transaction=true（默认 false），否则周期交易无法建立、recur 闭环不工作
+#   另：ezBookkeeping 周期/计划交易开关已在 docker-compose.yml 显式声明 EBK_USER_ENABLE_SCHEDULED_TRANSACTION=true（默认开启），否则周期交易无法建立、recur 闭环不工作
 ```
+
+⚠️ **WEBHOOK_SECRET 改 .env 不会自动生效**：`.env` 里的 `WEBHOOK_SECRET` 不被 compose 注入任何容器，仅当「n8n 变量 `webhook_secret` = Vikunja 两个 Webhook URL 末尾 `?secret=`」三处字符串完全一致时才生效。改 `.env` 后必须同步改这两处，否则 Auth Guard 会丢弃所有请求、桥接停摆。
 
 启动后：
 - NPM 管理后台 `http://<主机IP>:81`（仅内网，勿对公网开放）

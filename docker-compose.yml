@@ -71,6 +71,15 @@ services:
       VIKUNJA_MAILER_SKIPTLSVERIFY: "false"
     restart: unless-stopped
     networks: [appnet]
+    # 健康检查：vikunja 镜像是 scratch（无 shell/wget），用二进制自带的 healthcheck 子命令（检查 DB 连通性）。
+    # 注意：此处只加探针做状态展示与异常自动重启，未使用 depends_on: condition: service_healthy，
+    # 避免探针未就绪时阻塞依赖方启动。
+    healthcheck:
+      test: ["CMD", "/app/vikunja/vikunja", "healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   # ---- 财务管理 ezBookkeeping（不发布主机端口）----
   ezbookkeeping:
@@ -114,6 +123,13 @@ services:
       EBK_USER_ENABLE_SCHEDULED_TRANSACTION: "true"
     restart: unless-stopped
     networks: [appnet]
+    # 健康检查：ezBookkeeping 镜像基于 alpine，自带 busybox wget；/healthz.json 挂在根路由（无 /api/v1 前缀）、免认证。
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8080/healthz.json || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   # ---- 自动化桥接 n8n（不发布主机端口）----
   # 启动顺序：下方 depends_on 已声明依赖 vikunja / ezbookkeeping（见下方块，已生效、非注释）。首次启动 n8n 可能暂先于上游就绪，手动重跑一次触发器即可。
@@ -133,8 +149,18 @@ services:
       N8N_SECURE_COOKIE: "true"
       N8N_PROTOCOL: "https"
       WEBHOOK_URL: "https://flow.${DOMAIN}"
+      # n8n 凭证/变量加密密钥：必须显式设置并备份（见 .env），首次启动前确定，
+      # 之后修改会导致已有凭证/变量无法解密。
+      N8N_ENCRYPTION_KEY: "${N8N_ENCRYPTION_KEY}"
     restart: unless-stopped
     networks: [appnet]
+    # 健康检查：n8n 镜像基于 debian，优先用 curl、缺失时回退 wget；/healthz 在容器端口 5678 返回 200。
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5678/healthz || wget -q -O /dev/null http://localhost:5678/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
 # ===== 首次启动（在仓库根目录执行）=====
 # cp .env.example .env   # 然后填好真实值（包含镜像版本）
@@ -142,5 +168,5 @@ services:
 #          data/vikunja/files data/vikunja/db \
 #          data/ezbookkeeping/data data/ezbookkeeping/storage \
 #          data/n8n data/backup_staging
-# chown -R 1000:1000 data/ezbookkeeping/data data/ezbookkeeping/storage data/vikunja/files data/vikunja/db
+# chown -R 1000:1000 data/ezbookkeeping/data data/ezbookkeeping/storage data/vikunja/files data/vikunja/db data/n8n data/backup_staging
 # docker compose up -d
