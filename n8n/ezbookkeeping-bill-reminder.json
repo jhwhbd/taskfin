@@ -3,13 +3,23 @@
   "nodes": [
     {
       "parameters": {
-        "rule": { "interval": [ { "field": "cronExpression", "expression": "0 9 * * *" } ] }
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
       },
       "id": "d1",
       "name": "Daily 09:00",
       "type": "n8n-nodes-base.cron",
       "typeVersion": 2,
-      "position": [250, 300]
+      "position": [
+        250,
+        300
+      ]
     },
     {
       "parameters": {
@@ -20,7 +30,10 @@
       "name": "说明(Sticky)",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [250, 120],
+      "position": [
+        250,
+        120
+      ],
       "width": 420,
       "height": 160
     },
@@ -31,13 +44,22 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "=Bearer {{ $vars.ezb_token }}" },
-            { "name": "X-Timezone-Name", "value": "Asia/Shanghai" }
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $vars.ezb_token }}"
+            },
+            {
+              "name": "X-Timezone-Name",
+              "value": "Asia/Shanghai"
+            }
           ]
         },
         "qsParameters": {
           "parameters": [
-            { "name": "count", "value": 50 }
+            {
+              "name": "count",
+              "value": 50
+            }
           ]
         }
       },
@@ -45,26 +67,56 @@
       "name": "ezB List (recent)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [480, 300]
+      "position": [
+        480,
+        300
+      ]
     },
     {
       "parameters": {
-        "functionCode": "// 筛出临期账单提醒候选；显式排除「贷款还款」分类（贷款不提醒，仅跟踪）\nconst loanCat = $vars.ezb_cat_loan;\nconst items = $input.item.json.result || $input.item.json || {};\nconst txs = Array.isArray(items) ? items : (items.transactions || []);\nconst out = [];\nfor (const tx of txs) {\n  // 显式按分类排除贷款：ezB 交易携带 categoryId（嵌套 category.id 兜底）；贷款交易不进提醒\n  const catId = (tx.categoryId !== undefined) ? tx.categoryId : (tx.category && (tx.category.id !== undefined ? tx.category.id : undefined));\n  if (loanCat && String(catId) === String(loanCat)) continue;\n  const c = (tx.comment || '').toString();\n  if (/(待付|账单|缴费|续费)/.test(c)) {\n    out.push({ json: { txId: tx.id, comment: c, amount: tx.sourceAmount, categoryId: catId } });\n  }\n}\nreturn out;"
+        "functionCode": "// 筛出临期账单提醒候选；显式排除「贷款还款」分类（贷款不提醒，仅跟踪）\nconst loanCat = $vars.ezb_cat_loan;\nconst body = $input.item.json || {};\nconst result = (body && body.result) || body || {};\nconst txs = Array.isArray(result) ? result : (result.items || []);\nconst out = [];\nfor (const tx of txs) {\n  // 显式按分类排除贷款：ezB 交易携带 categoryId（嵌套 category.id 兜底）；贷款交易不进提醒\n  const catId = (tx.categoryId !== undefined) ? tx.categoryId : (tx.category && (tx.category.id !== undefined ? tx.category.id : undefined));\n  if (loanCat && String(catId) === String(loanCat)) continue;\n  const c = (tx.comment || '').toString();\n  if (/(待付|账单|缴费|续费)/.test(c)) {\n    out.push({ json: { txId: tx.id, comment: c, amount: tx.sourceAmount, categoryId: catId } });\n  }\n}\nreturn out;"
       },
       "id": "d4",
       "name": "Filter Due Bills",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [710, 300]
+      "position": [
+        710,
+        300
+      ]
     }
   ],
   "connections": {
-    "Daily 09:00": { "main": [ [ { "node": "ezB List (recent)", "type": "main", "index": 0 } ] ] },
-    "ezB List (recent)": { "main": [ [ { "node": "Filter Due Bills", "type": "main", "index": 0 } ] ] }
+    "Daily 09:00": {
+      "main": [
+        [
+          {
+            "node": "ezB List (recent)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ezB List (recent)": {
+      "main": [
+        [
+          {
+            "node": "Filter Due Bills",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
-  "settings": { "executionOrder": "v1" },
+  "settings": {
+    "executionOrder": "v1"
+  },
   "active": false,
   "versionId": "1",
-  "meta": { "instanceId": "local" },
+  "meta": {
+    "instanceId": "local"
+  },
   "id": "ezbookkeeping-bill-reminder"
 }

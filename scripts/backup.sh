@@ -69,7 +69,7 @@ done
 # 前置条件：ezB 需开启 EBK_DATA_ENABLE_EXPORT=true 且 EZB_TOKEN 已填，否则该步自动跳过。
 if [ "$EXPORT_CSV" = "1" ] && [ -n "$EZB_TOKEN" ]; then
   echo "[3/4] 导出 ezBookkeeping CSV（人读辅助）..."
-  docker exec ezbookkeeping sh -c "(command -v wget >/dev/null 2>&1 && wget -qO- 'http://localhost:8080/api/data/export.csv?utcOffset=480' --header='Authorization: Bearer $EZB_TOKEN') || (command -v curl >/dev/null 2>&1 && curl -s -H 'Authorization: Bearer $EZB_TOKEN' 'http://localhost:8080/api/data/export.csv?utcOffset=480')" \
+  docker exec ezbookkeeping sh -c "(command -v wget >/dev/null 2>&1 && wget -qO- 'http://localhost:8080/api/v1/data/export.csv' --header='Authorization: Bearer $EZB_TOKEN' --header='X-Timezone-Name: Asia/Shanghai') || (command -v curl >/dev/null 2>&1 && curl -s -H 'Authorization: Bearer $EZB_TOKEN' -H 'X-Timezone-Name: Asia/Shanghai' 'http://localhost:8080/api/v1/data/export.csv')" \
     > "$STAGING/ezbookkeeping.csv" 2>/dev/null \
     || echo "  警告：CSV 导出失败（可能未开 EBK_DATA_ENABLE_EXPORT 或容器内无 wget/curl），继续（不影响主备）"
 else
@@ -78,7 +78,8 @@ fi
 
 # 4) 高压缩 + 写入共享 + 仅留 3 份
 echo "[4/4] 压缩并写入共享 ..."
-FILES=( "$STAGING"/vikunja-*.zip "$STAGING"/*.db "$STAGING"/ezbookkeeping.csv )
+# P1-2：WAL 三件套一并归档（仅 *.db 会漏掉 -wal/-shm，导致未 checkpoint 时丢最近交易）
+FILES=( "$STAGING"/vikunja-*.zip "$STAGING"/*.db "$STAGING"/*.db-wal "$STAGING"/*.db-shm "$STAGING"/ezbookkeeping.csv )
 # 去掉不存在的项；同时取出文件名（供 tar -C 使用，避免 ls 命令替换对含空格文件名分词出错）
 existing=()
 for f in "${FILES[@]}"; do [ -e "$f" ] && existing+=("$f"); done
@@ -115,6 +116,6 @@ echo "  当前共享内备份："
 ls -lh "$SMB_DIR"/taskfin-backup-*.* 2>/dev/null | awk '{print $5, $9}'
 
 # 清理本次临时文件
-rm -f "$STAGING"/vikunja-*.zip "$STAGING"/*.db "$STAGING"/ezbookkeeping.csv 2>/dev/null || true
+rm -f "$STAGING"/vikunja-*.zip "$STAGING"/*.db "$STAGING"/*.db-wal "$STAGING"/*.db-shm "$STAGING"/ezbookkeeping.csv 2>/dev/null || true
 
 echo "===== 备份完成 $(date +%Y%m%d-%H%M%S) ====="
