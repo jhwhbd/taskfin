@@ -51,7 +51,10 @@ taskfin/
 ├── README.md
 ├── LICENSE
 ├── scripts/
-│   ├── backup.sh           # 群晖任务计划用：全量备份 + 高压缩 + 保留近期 14 份（GFS）
+│   ├── backup.sh           # 群晖任务计划用：全量备份 + 高压缩 + 保留近期 14 份（GFS）+ 备份完整性自检 + 失败告警
+│   ├── monitor.sh          # 健康检查与告警：探活 5 个容器，异常经 TASKFIN_ALERT_URL 推送（建议每 15 分钟执行）
+│   ├── deploy.sh           # 一键部署：建目录/赋权/构建/拉起/自检 + 打印后续手动事项
+│   ├── check-config.sh     # 部署前配置自检：密钥占位符检查 + webhook 三处一致性同步清单
 │   ├── init.sh             # 部署后初始化：Vikunja 建首管理员（幂等可重跑）
 │   └── check-vendor.sh     # 比对 vendor/ 上游源码哈希与 GitHub 最新提交
 ├── n8n/                    # n8n 工作流导出（在 n8n 里 Import from File 导入；默认均禁用，按需启用）
@@ -99,11 +102,12 @@ docker compose up -d
 # 4. 导入 n8n 工作流（默认均禁用 active:false，按需手动 Enable）
 #   在 n8n 界面（flow.<域名> → Workflows → Import from File）逐个导入 n8n/*.json
 #   必开：vikunja-task-sync / vikunja-budget-plan / ezbookkeeping-poll
-#   选开：ezbookkeeping-bill-reminder（仅过滤、未接发送节点）、ezbookkeeping-recur-tag（每日06:30自动 + 手动 POST /recur-tag，建议 Authorization: Basic 头，兼容 ?secret=）
+#   选开：ezbookkeeping-recur-tag（每日06:30自动 + 手动 POST /recur-tag，建议 Authorization: Basic 头）、
+#         ezbookkeeping-bill-reminder（到期账单邮件提醒，需先在 n8n 建 "QQ SMTP" 凭据）
 #   另：ezBookkeeping 周期/计划交易开关已在 docker-compose.yml 显式声明 EBK_USER_ENABLE_SCHEDULED_TRANSACTION=true（默认开启），否则周期交易无法建立、recur 闭环不工作
 ```
 
-⚠️ **WEBHOOK_SECRET 改 .env 不会自动生效**：`.env` 里的 `WEBHOOK_SECRET` 不被 compose 注入任何容器，仅当「n8n 变量 `webhook_secret` = Vikunja 两个 Webhook 的 Basic Auth 密码（或 URL 末尾 `?secret=`）」一致时才生效。改 `.env` 后必须同步改这两处，否则 Auth Guard 会丢弃所有请求、桥接停摆。现推荐在 Vikunja Webhook 配置里改用 **Basic Auth**（用户名填 `taskfin`、密码填 `webhook_secret`），由 n8n 校验 `Authorization: Basic` 头，密钥不再出现在 URL/日志；旧的 `?secret=` 方式仍兼容（过渡期可并存）。
+⚠️ **WEBHOOK_SECRET 已单源化**：`.env` 的 `WEBHOOK_SECRET` 由 compose 注入 n8n 容器环境变量，三个工作流 Auth Guard 直接读 `$env.WEBHOOK_SECRET` 校验 `Authorization: Basic` 头——改 `.env` 后 `docker compose restart n8n` 即生效，**不再需要三处同步**。Vikunja Webhook 侧只需保证 **Basic Auth 密码**（或 URL 末尾 `?secret=`）与 `.env` 该值一致即可；旧的 `?secret=` 方式仍兼容（过渡期可并存）。
 
 启动后：
 - NPM 管理后台 `http://127.0.0.1:81`（已绑定本机回环，仅本机/SSH 隧道可访问；勿对 LAN/WAN 开放）
@@ -116,8 +120,16 @@ docker compose up -d
 
 1. **CalDAV 手机闹钟**：Vikunja 的 CalDAV 可能只同步事件、不导出 VALARM，手机可能不弹闹钟；可靠提醒仍是 QQ 邮件兜底。
 2. **n8n 五个 JSON 未实机校验**：`fund:` 标签解析、金额×100、`typeVersion`、Webhook 路径需在真机联调。
-3. **确认备份共享子目录真实存在**：`scripts/backup.sh` 的 `SMB_DIR` 已锚定 `/volume1/share/taskfin_backup`，部署前请在 DSM「控制面板 → 共享文件夹」确认该子目录真实存在（否则脚本会因目录不存在而报错退出）。
-4. **n8n 共 5 个工作流**：核心 3 个（task-sync / budget-plan / poll）必开；`recur-tag` 默认禁用、每日 06:30 定时 + 手动 `POST /recur-tag` 触发（仅当使用「定期扣款」闭环时才需启用）；`bill-reminder` 默认禁用且当前模板未接发送节点、启用也不发邮件。所有流程的 webhook 密钥 `webhook_secret` 须与 §5.3 的 `WEBHOOK_SECRET` 及 Vikunja Webhook 的 Basic Auth 密码（或 URL 里的 `?secret=`）保持一致。
+3. **备份共享子目录不存在会自动创建**：`scripts/backup.sh` 的 `SMB_DIR` 锚定 `/volume1/share/taskfin_backup`，首次运行若目录不存在会自动 `mkdir -p` 建好；若需换位置，脚本顶部变量或环境变量 `TASKFIN_BACKUP_DIR` 均可覆盖。备份留存默认 14 份（GFS），`backup.sh` 已内置 `sqlite3 integrity_check` 做备份完整性自检 + 失败经 `TASKFIN_ALERT_URL` 告警。
+4. **n8n 共 5 个工作流**：核心 3 个（task-sync / budget-plan / poll）必开；`recur-tag` 默认禁用、每日 06:30 定时 + 手动 `POST /recur-tag` 触发（仅当使用「定期扣款」闭环时才需启用）；`bill-reminder` 默认禁用、已挂 Send Email（QQ SMTP）节点，启用后每日 09:00 自动过滤到期账单并邮件提醒。webhook 密钥已单源化：`.env` `WEBHOOK_SECRET` 由 compose 注入 n8n 容器环境变量，Auth Guard 直接读 `$env.WEBHOOK_SECRET`，改 `.env` 后 `docker compose restart n8n` 即生效。
+
+## 已知限制（不阻塞使用，记录备查）
+
+1. **删除/编辑不双向清理**：Vikunja 任务删除或 ezBookkeeping 账单编辑/删除后，**另一端不自动清理**，会留下关联的孤立数据（孤儿评论/孤立支出）。当前设计未加清理逻辑，依赖用户手动处理或将来补架构级改动。
+2. **`fund:` 多币种解析未接入**：`fund_currency` 字段已在 task-sync 中解析，但 ezBookkeeping 建账**只用 CNY**，多币种场景暂不支持。
+3. **Vikunja webhook 不支持 HMAC 校验**：Vikunja 原生发 `X-Vikunja-Signature` 头，但 n8n 1.x 无法取原始 body 验 HMAC，故本方案改用 `Authorization: Basic` 头校验（密钥来自 `.env` 单源）。
+4. **`check-vendor.sh` 只比对 HEAD**：仅检查 vendor 上游 HEAD 是否前进，**不校验安全审查/合规状态**（脚本头部注释已声明）。
+5. **bill-reminder 模板**：仅过滤「到期且未勾掉」账单，未对贷款/订阅等特殊账单做排除（sticky 注释已提示）。
 
 ## 镜像版本锁定
 

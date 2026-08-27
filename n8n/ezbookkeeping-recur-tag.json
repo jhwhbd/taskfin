@@ -40,7 +40,7 @@
     },
     {
       "parameters": {
-        "functionCode": "// P1 防御：校验 webhook 密钥。\n// 优先 Authorization: Basic base64(taskfin:<secret>) 头（推荐，密钥不进 URL/日志）；\n// 兼容历史 ?secret= 查询参数（过渡期保留，配置 Vikunja Basic Auth 后从 URL 移除即可）。\nconst expected = (typeof $vars !== 'undefined' && $vars && $vars.webhook_secret) ? $vars.webhook_secret : '';\nif (!expected) return [];\nconst h = ($input.item.json && $input.item.json.headers) || {};\nconst authHeader = h['authorization'] || h['Authorization'] || '';\nconst expectedBasic = 'Basic ' + Buffer.from('taskfin:' + expected).toString('base64');\nif (authHeader && authHeader === expectedBasic) return $input.all();\nconst q = ($input.item.json && $input.item.json.query) || {};\nconst got = q.secret || '';\nif (got && got === expected) return $input.all();\nreturn [];"
+        "functionCode": "// P1 防御：校验 webhook 密钥（单源：WEBHOOK_SECRET 由 compose 注入 n8n 容器环境变量，不再依赖 n8n 内部变量）。\n// 优先 Authorization: Basic base64(taskfin:<secret>) 头（推荐，密钥不进 URL/日志）；\n// 兼容历史 ?secret= 查询参数（过渡期保留，配置 Vikunja Basic Auth 后从 URL 移除即可）。\nconst expected = process.env.WEBHOOK_SECRET || '';\nif (!expected) return [];\nconst h = ($input.item.json && $input.item.json.headers) || {};\nconst authHeader = h['authorization'] || h['Authorization'] || '';\nconst expectedBasic = 'Basic ' + Buffer.from('taskfin:' + expected).toString('base64');\nif (authHeader && authHeader === expectedBasic) return $input.all();\nconst q = ($input.item.json && $input.item.json.query) || {};\nconst got = q.secret || '';\nif (got && got === expected) return $input.all();\nreturn [];"
       },
       "id": "rt1b",
       "name": "Auth Guard (secret)",

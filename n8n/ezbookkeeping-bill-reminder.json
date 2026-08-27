@@ -23,7 +23,7 @@
     },
     {
       "parameters": {
-        "notice": "模板工作流：ezBookkeeping 周期/计划交易可通过其「预定交易(Scheduled Transaction)」或自定义查询接口获取。下方 HTTP Request 拉取近期交易，Function 节点筛出临期项，再用「发送邮件」节点经 QQ SMTP 提醒。请按实际接口补全 URL 与筛选逻辑，并配置 n8n Email 节点的 QQ SMTP 凭据。",
+        "notice": "账单临期提醒工作流：每日 09:00 拉取 ezB 近期交易，筛出含「待付/账单/缴费/续费」且非贷款分类的条目，聚合为一封邮件经 QQ SMTP 发出。\n前置：① 在 n8n 创建一个 SMTP 凭据（类型 smtp，命名 \"QQ SMTP\"），填 smtp.qq.com:465(SSL)、用户 <QQ_EMAIL>@qq.com、密码 <QQ_AUTH_CODE>；② 发件/收件地址取自 n8n 容器环境变量 $env.QQ_EMAIL。\n已在下方挂「Build Email Body」+「Send Email (QQ SMTP)」节点，启用即生效。",
         "notesInFlow": true
       },
       "id": "d2",
@@ -84,6 +84,42 @@
         710,
         300
       ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// 聚合所有临期账单为单封邮件；无则跳过（不发送）\nconst items = $input.all().map(i => i.json);\nif (items.length === 0) return [];\nconst esc = s => String(s == null ? '' : s).replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));\nconst rows = items.map(t => `<li>${esc(t.comment)} — ¥${t.amount}（分类 ${t.categoryId}）</li>`).join('');\nconst html = `<h3>TaskFIN 账单到期提醒</h3><p>你有 ${items.length} 笔账单临近到期/待付：</p><ul>${rows}</ul><p style=\"color:#888\">— 来自 ezBookkeeping 账单提醒工作流</p>`;\nreturn [{ json: { count: items.length, html } }];"
+      },
+      "id": "d5",
+      "name": "Build Email Body",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        940,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $env.QQ_EMAIL }}@qq.com",
+        "toEmail": "={{ $env.QQ_EMAIL }}@qq.com",
+        "subject": "📅 账单到期提醒（TaskFIN）",
+        "emailFormat": "html",
+        "html": "={{ $json.html }}",
+        "options": {}
+      },
+      "id": "d6",
+      "name": "Send Email (QQ SMTP)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1160,
+        220
+      ],
+      "credentials": {
+        "smtp": {
+          "name": "QQ SMTP"
+        }
+      }
     }
   ],
   "connections": {
@@ -103,6 +139,28 @@
         [
           {
             "node": "Filter Due Bills",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Due Bills": {
+      "main": [
+        [
+          {
+            "node": "Build Email Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Email Body": {
+      "main": [
+        [
+          {
+            "node": "Send Email (QQ SMTP)",
             "type": "main",
             "index": 0
           }
