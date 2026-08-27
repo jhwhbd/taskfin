@@ -122,6 +122,6 @@ for (const [buf, rel] of targets) {
 }
 console.log(`[apply] 已铺 ${placed} 个文件到 vendor/（Vikunja + ezBookkeeping）`);
 
-// splash_screens（42 个设备启动图）为设备分辨率全屏图，需逐尺寸映射，留作手动/可选步骤，未自动生成。
-console.log('\n完成。提示：ezBookkeeping 的 public/img/splash_screens/（42 个设备启动图）未自动生成，需要时单独处理。');
+// splash_screens（42 个设备启动图）由 scripts/gen-splash.cjs 单独生成（见该脚本用法注释）。
+console.log('\n完成。提示：ezBookkeeping 的 public/img/splash_screens/（42 个设备启动图）由 scripts/gen-splash.cjs 生成，需要时运行该脚本。');
 })();

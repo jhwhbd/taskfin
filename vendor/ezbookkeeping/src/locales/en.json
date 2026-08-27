@@ -160,22 +160,22 @@
             "clearTransactionsTagsTip": "You CANNOT undo this action. This will clear all tags from {count} transactions.",
             "accountActivationAndResendValidationEmailTip": "Account activation link has been sent to your email address: {email}, If you don't receive the mail, please fill password again and click the button below to resend the validation mail.",
             "resendValidationEmailTip": "If you don't receive the mail, please fill password again and click the button below to resend the validation mail to: {email}",
-            "oauth2bindTip": "You're signing in to the {userName} user using {providerName}. Please enter your ezBookkeeping password to verify."
+            "oauth2bindTip": "You're signing in to the {userName} user using {providerName}. Please enter your TaskFIN password to verify."
         }
     },
     "dataExport": {
-        "defaultExportFilename": "ezBookkeeping_export_data",
-        "exportFilename": "ezBookkeeping_{nickname}_export_data",
-        "defaultExportStatisticsFileName": "ezBookkeeping_statistics_data",
-        "exportStatisticsFileName": "ezBookkeeping_{nickname}_statistics_data",
-        "defaultExportReconciliationStatementsFileName": "ezBookkeeping_reconciliation_statements",
-        "exportReconciliationStatementsFileName": "ezBookkeeping_{nickname}_reconciliation_statements",
-        "defaultInsightsExplorerQueryFileName": "ezBookkeeping_insights_explorer_query",
-        "insightsExplorerQueryFileName": "ezBookkeeping_{nickname}_insights_explorer_query",
-        "defaultImportDataMappingFileName": "ezBookkeeping_import_data_mapping",
-        "defaultImportHandlingScript": "ezBookkeeping_handling_script",
-        "defaultImportReplaceRuleFileName": "ezBookkeeping_import_replace_rule",
-        "defaultImportCheckResultFileName": "ezBookkeeping_import_check_result"
+        "defaultExportFilename": "TaskFIN_export_data",
+        "exportFilename": "TaskFIN_{nickname}_export_data",
+        "defaultExportStatisticsFileName": "TaskFIN_statistics_data",
+        "exportStatisticsFileName": "TaskFIN_{nickname}_statistics_data",
+        "defaultExportReconciliationStatementsFileName": "TaskFIN_reconciliation_statements",
+        "exportReconciliationStatementsFileName": "TaskFIN_{nickname}_reconciliation_statements",
+        "defaultInsightsExplorerQueryFileName": "TaskFIN_insights_explorer_query",
+        "insightsExplorerQueryFileName": "TaskFIN_{nickname}_insights_explorer_query",
+        "defaultImportDataMappingFileName": "TaskFIN_import_data_mapping",
+        "defaultImportHandlingScript": "TaskFIN_handling_script",
+        "defaultImportReplaceRuleFileName": "TaskFIN_import_replace_rule",
+        "defaultImportCheckResultFileName": "TaskFIN_import_check_result"
     },
     "calendar": {
         "Gregorian": "Gregorian",
@@ -2130,7 +2130,7 @@
     "Filter Description": "Filter Description",
     "How to import this file?": "How to import this file?",
     "How to export this file?": "How to export this file?",
-    "ezBookkeeping File Format": "ezBookkeeping File Format",
+    "ezBookkeeping File Format": "TaskFIN File Format",
     "Custom File Format": "Custom File Format",
     "General Data Exchange Format": "General Data Exchange Format",
     "General Bank Statement Format": "General Bank Statement Format",

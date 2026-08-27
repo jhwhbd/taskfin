@@ -6,7 +6,6 @@
 
 | n8n 变量名 | 配置位置 | 取值 | 用途 | 使用的工作流 |
 |---|---|---|---|---|
-| `webhook_secret` | n8n `Settings → Variables` | 随机串（建议 `openssl rand -hex 16`） | P1 静态密钥校验：Webhook 节点比对 `?secret=`，不符直接丢弃 | task-sync / budget-plan / recur-tag |
 | `ezb_token` | n8n `Settings → Variables` | ezBookkeeping 用户的 API Token（网页「设置 → 令牌」生成） | `Authorization: Bearer` 调用 ezB API | task-sync / poll / recur-tag / bill-reminder |
 | `vikunja_token` | n8n `Settings → Variables` | Vikunja 用户的 API Token（网页「设置 → 令牌」生成） | `Authorization: Bearer` 调用 Vikunja API | task-sync / budget-plan |
 | `ezb_cat_expense` | n8n `Settings → Variables` | ezB 支出分类 ID（**字符串**，如 `"1"`） | task-sync 建账时填 `categoryId`（见下方注意） | task-sync |
@@ -20,8 +19,7 @@
 
 | 概念 | `.env` 项 | 说明 |
 |---|---|---|
-| Webhook 密钥 | `WEBHOOK_SECRET` | 该值与上面的 n8n `webhook_secret` **必须是同一个串**；同时 Vikunja 里两个 Webhook 的 Target URL 末尾要补 `?secret=<同一值>`（见 `docs/实施部署手册.md` §6）。三处不一致会导致新 Auth Guard 丢弃所有请求、桥接停摆。 |
-> ⚠️ **`WEBHOOK_SECRET` 仅由文档约束、不被 compose 消费**：`.env` 的 `WEBHOOK_SECRET` 在 `docker-compose.yml` 中无任何服务引用（不会注入容器环境变量），仅靠「本值 = n8n `webhook_secret` = Vikunja 两个 Webhook URL 末尾 `?secret=`」三处一致来生效，compose 层无强制校验。部署时务必人工核对三处一致，否则桥接停摆。 |
+| Webhook 密钥 | `WEBHOOK_SECRET` | 已**单源化**：`.env` 的 `WEBHOOK_SECRET` 由 `docker-compose.yml` 注入 n8n 容器环境变量，三个工作流的 Auth Guard 直接读 `$env.WEBHOOK_SECRET`（即 `process.env.WEBHOOK_SECRET`）校验 `Authorization: Basic` 头——**无需在 n8n 新建 `webhook_secret` 变量**。改 `.env` 后 `docker compose restart n8n` 即生效。Vikunja 侧只需保证 Webhook 的 Basic Auth 密码（或 URL 末尾 `?secret=`）与此值一致（见 `docs/实施部署手册.md` §6）。 |
 | ezB 用户令牌 | （无独立 `.env` 项） | ezB API Token 直接在 n8n `ezb_token` 填，不从 `.env` 读取。 |
 | Vikunja 用户令牌 | （无独立 `.env` 项） | 同上，填 n8n `vikunja_token`。 |
 
@@ -30,8 +28,8 @@
 ## 三、填写顺序建议
 
 1. 在 ezB / Vikunja 网页各生成一个 API Token。
-2. n8n `Settings → Variables` 新建上述 7 个变量，粘贴对应值（ID 类按字符串填）。
-3. 生成 `webhook_secret` 随机串，同时写入 n8n `webhook_secret` 与 `.env` 的 `WEBHOOK_SECRET`，并补到两个 Vikunja Webhook URL 末尾。
+2. n8n `Settings → Variables` 新建上述 6 个变量，粘贴对应值（ID 类按字符串填）。
+3. 在 `.env` 设置 `WEBHOOK_SECRET`（compose 会自动注入 n8n，Auth Guard 直接读取，无需在 n8n 建 `webhook_secret` 变量）；并确认 Vikunja 两个 Webhook 的 Basic Auth 密码（或 URL 末尾 `?secret=`）与此值一致。
 4. 导入 5 个 `n8n/*.json`，按需要 Enable（核心 3 个必开；recur-tag / bill-reminder 按需）。
 5. 逐步联调（见手册 §B2）：先手动「执行工作流」跑通，再启用 Webhook / 定时。
 

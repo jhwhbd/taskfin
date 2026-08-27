@@ -67,5 +67,11 @@ fi
 
 msg="taskfin 健康检查异常 @ $TS：${unhealthy[*]}"
 alert "$msg"
-# 监控脚本本身退出 0（避免任务计划误报），告警已通过上述通道送达
-exit 0
+# 已配置告警通道：视为已送达，退出 0（避免任务计划重复误报）；
+# 未配置通道：以非 0 退出，让任务计划捕获失败（否则静默漏警）
+if [ -n "$TASKFIN_ALERT_URL" ]; then
+  exit 0
+else
+  echo "（未配置 TASKFIN_ALERT_URL，无告警通道，以非 0 退出以便任务计划捕获）" >&2
+  exit 1
+fi

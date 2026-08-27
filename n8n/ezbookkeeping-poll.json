@@ -34,7 +34,7 @@
             },
             {
               "name": "X-Timezone-Name",
-              "value": "Asia/Shanghai"
+              "value": "={{ DateTime.now().zoneName }}"
             }
           ]
         },

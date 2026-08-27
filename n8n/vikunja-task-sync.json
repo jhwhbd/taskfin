@@ -154,7 +154,7 @@
             },
             {
               "name": "X-Timezone-Name",
-              "value": "Asia/Shanghai"
+              "value": "={{ DateTime.now().zoneName }}"
             }
           ]
         },
@@ -241,7 +241,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// P2 增强：创建 ezB 支出前，先查 ezB 自身是否已有含 #auto-<taskId> 的支出，\n// 关闭「先记 ezB、后写 Vikunja 评论」崩溃窗口导致的重复记账。\nconst taskId = $json.taskId;\nconst auth = 'Bearer ' + $vars.ezb_token;\nconst base = 'http://ezbookkeeping:8080/api/v1';\ntry {\n  const resp = await this.helpers.httpRequest({\n    method: 'GET',\n    url: base + '/transactions/list.json?count=100',\n    headers: { Authorization: auth, 'Content-Type': 'application/json', 'X-Timezone-Name': 'Asia/Shanghai' },\n    json: true\n  });\n  const result = (resp && resp.result) || resp || {};\n  const items = Array.isArray(result) ? result : (result.items || []);\n  const marker = '#auto-' + taskId;\n  const exists = items.some(t => (t.comment || '').includes(marker));\n  return [{ json: { ...$json, alreadyInEzb: exists } }];\n} catch (e) {\n  return [{ json: { ...$json, alreadyInEzb: false, ezbCheckError: (e && e.message) ? e.message : String(e) } }];\n}"
+        "jsCode": "// P2 增强：创建 ezB 支出前，先查 ezB 自身是否已有含 #auto-<taskId> 的支出，\n// 关闭「先记 ezB、后写 Vikunja 评论」崩溃窗口导致的重复记账。\nconst taskId = $json.taskId;\nconst auth = 'Bearer ' + $vars.ezb_token;\nconst base = 'http://ezbookkeeping:8080/api/v1';\ntry {\n  const resp = await this.helpers.httpRequest({\n    method: 'GET',\n    url: base + '/transactions/list.json?count=100',\n    headers: { Authorization: auth, 'Content-Type': 'application/json', 'X-Timezone-Name': (typeof $env !== 'undefined' && $env && $env.TZ ? $env.TZ : 'Asia/Shanghai') },\n    json: true\n  });\n  const result = (resp && resp.result) || resp || {};\n  const items = Array.isArray(result) ? result : (result.items || []);\n  const marker = '#auto-' + taskId;\n  const exists = items.some(t => (t.comment || '').includes(marker));\n  return [{ json: { ...$json, alreadyInEzb: exists } }];\n} catch (e) {\n  return [{ json: { ...$json, alreadyInEzb: false, ezbCheckError: (e && e.message) ? e.message : String(e) } }];\n}"
       },
       "id": "a3d",
       "name": "ezB Check Existing",

@@ -7,7 +7,7 @@
 //   - logo 尺寸 = 短边 × 18%
 //   - 文字尺寸 = logo 尺寸 × 22%
 //
-// 用法：NODE_PATH=<workspace>/node_modules node scripts/gen-splash.cjs
+// 用法：node scripts/gen-splash.cjs   （依赖已随仓库 npm install 装到根 node_modules，无需手动设 NODE_PATH）
 // 前提：branding/taskfin.svg 存在；node_modules 含 @resvg/resvg-js + opentype.js
 
 const fs   = require('fs');

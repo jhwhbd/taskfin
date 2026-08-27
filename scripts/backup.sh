@@ -99,7 +99,10 @@ fi
 # 前置条件：ezB 需开启 EBK_DATA_ENABLE_EXPORT=true 且 EZB_TOKEN 已填，否则该步自动跳过。
 if [ "$EXPORT_CSV" = "1" ] && [ -n "$EZB_TOKEN" ]; then
   echo "[3/4] 导出 ezBookkeeping CSV（人读辅助）..."
-  docker exec ezbookkeeping sh -c "(command -v wget >/dev/null 2>&1 && wget -qO- 'http://localhost:8080/api/v1/data/export.csv' --header='Authorization: Bearer $EZB_TOKEN' --header='X-Timezone-Name: Asia/Shanghai') || (command -v curl >/dev/null 2>&1 && curl -s -H 'Authorization: Bearer $EZB_TOKEN' -H 'X-Timezone-Name: Asia/Shanghai' 'http://localhost:8080/api/v1/data/export.csv')" \
+  # 时区与容器一致：优先读 .env 的 TZ，缺省回退 Asia/Shanghai（与 compose 单 TZ 源保持一致，避免改 TZ 后 CSV 时间错位）
+  TZ_VAL="$(grep -E '^TZ=' "$PROJECT_DIR/.env" 2>/dev/null | head -1 | cut -d= -f2-)"
+  TZ_VAL="${TZ_VAL:-Asia/Shanghai}"
+  docker exec ezbookkeeping sh -c "(command -v wget >/dev/null 2>&1 && wget -qO- 'http://localhost:8080/api/v1/data/export.csv' --header='Authorization: Bearer $EZB_TOKEN' --header='X-Timezone-Name: $TZ_VAL') || (command -v curl >/dev/null 2>&1 && curl -s -H 'Authorization: Bearer $EZB_TOKEN' -H 'X-Timezone-Name: $TZ_VAL' 'http://localhost:8080/api/v1/data/export.csv')" \
     > "$STAGING/ezbookkeeping.csv" 2>/dev/null \
     || echo "  警告：CSV 导出失败（可能未开 EBK_DATA_ENABLE_EXPORT 或容器内无 wget/curl），继续（不影响主备）"
 else
