@@ -20,7 +20,7 @@
     },
     {
       "parameters": {
-        "functionCode": "// P1 防御：校验 webhook 静态密钥（?secret=）。失败直接丢弃，避免公网伪造记账。\nconst expected = (typeof $vars !== 'undefined' && $vars && $vars.webhook_secret) ? $vars.webhook_secret : '';\nconst q = ($input.item.json && $input.item.json.query) || {};\nconst got = q.secret || '';\nif (!(expected && got && got === expected)) {\n  return [];\n}\nreturn $input.all();"
+        "functionCode": "// P1 防御：校验 webhook 密钥。\n// 优先 Authorization: Basic base64(taskfin:<secret>) 头（推荐，密钥不进 URL/日志）；\n// 兼容历史 ?secret= 查询参数（过渡期保留，配置 Vikunja Basic Auth 后从 URL 移除即可）。\nconst expected = (typeof $vars !== 'undefined' && $vars && $vars.webhook_secret) ? $vars.webhook_secret : '';\nif (!expected) return [];\nconst h = ($input.item.json && $input.item.json.headers) || {};\nconst authHeader = h['authorization'] || h['Authorization'] || '';\nconst expectedBasic = 'Basic ' + Buffer.from('taskfin:' + expected).toString('base64');\nif (authHeader && authHeader === expectedBasic) return $input.all();\nconst q = ($input.item.json && $input.item.json.query) || {};\nconst got = q.secret || '';\nif (got && got === expected) return $input.all();\nreturn [];"
       },
       "id": "c1b",
       "name": "Auth Guard (secret)",

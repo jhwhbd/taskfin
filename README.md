@@ -98,11 +98,11 @@ docker compose up -d
 # 4. 导入 n8n 工作流（默认均禁用 active:false，按需手动 Enable）
 #   在 n8n 界面（flow.<域名> → Workflows → Import from File）逐个导入 n8n/*.json
 #   必开：vikunja-task-sync / vikunja-budget-plan / ezbookkeeping-poll
-#   选开：ezbookkeeping-bill-reminder（仅过滤、未接发送节点）、ezbookkeeping-recur-tag（每日06:30自动 + 手动 POST /recur-tag?secret=<webhook_secret>）
+#   选开：ezbookkeeping-bill-reminder（仅过滤、未接发送节点）、ezbookkeeping-recur-tag（每日06:30自动 + 手动 POST /recur-tag，建议 Authorization: Basic 头，兼容 ?secret=）
 #   另：ezBookkeeping 周期/计划交易开关已在 docker-compose.yml 显式声明 EBK_USER_ENABLE_SCHEDULED_TRANSACTION=true（默认开启），否则周期交易无法建立、recur 闭环不工作
 ```
 
-⚠️ **WEBHOOK_SECRET 改 .env 不会自动生效**：`.env` 里的 `WEBHOOK_SECRET` 不被 compose 注入任何容器，仅当「n8n 变量 `webhook_secret` = Vikunja 两个 Webhook URL 末尾 `?secret=`」三处字符串完全一致时才生效。改 `.env` 后必须同步改这两处，否则 Auth Guard 会丢弃所有请求、桥接停摆。
+⚠️ **WEBHOOK_SECRET 改 .env 不会自动生效**：`.env` 里的 `WEBHOOK_SECRET` 不被 compose 注入任何容器，仅当「n8n 变量 `webhook_secret` = Vikunja 两个 Webhook 的 Basic Auth 密码（或 URL 末尾 `?secret=`）」一致时才生效。改 `.env` 后必须同步改这两处，否则 Auth Guard 会丢弃所有请求、桥接停摆。现推荐在 Vikunja Webhook 配置里改用 **Basic Auth**（用户名填 `taskfin`、密码填 `webhook_secret`），由 n8n 校验 `Authorization: Basic` 头，密钥不再出现在 URL/日志；旧的 `?secret=` 方式仍兼容（过渡期可并存）。
 
 启动后：
 - NPM 管理后台 `http://127.0.0.1:81`（已绑定本机回环，仅本机/SSH 隧道可访问；勿对 LAN/WAN 开放）
@@ -116,7 +116,7 @@ docker compose up -d
 1. **CalDAV 手机闹钟**：Vikunja 的 CalDAV 可能只同步事件、不导出 VALARM，手机可能不弹闹钟；可靠提醒仍是 QQ 邮件兜底。
 2. **n8n 五个 JSON 未实机校验**：`fund:` 标签解析、金额×100、`typeVersion`、Webhook 路径需在真机联调。
 3. **确认备份共享子目录真实存在**：`scripts/backup.sh` 的 `SMB_DIR` 已锚定 `/volume1/share/taskfin_backup`，部署前请在 DSM「控制面板 → 共享文件夹」确认该子目录真实存在（否则脚本会因目录不存在而报错退出）。
-4. **n8n 共 5 个工作流**：核心 3 个（task-sync / budget-plan / poll）必开；`recur-tag` 默认禁用、每日 06:30 定时 + 手动 `POST /recur-tag?secret=<webhook_secret>` 触发（仅当使用「定期扣款」闭环时才需启用）；`bill-reminder` 默认禁用且当前模板未接发送节点、启用也不发邮件。所有流程的 webhook 密钥 `webhook_secret` 须与 §5.3 的 `WEBHOOK_SECRET` 及 Vikunja Webhook URL 里的 `?secret=` 保持一致。
+4. **n8n 共 5 个工作流**：核心 3 个（task-sync / budget-plan / poll）必开；`recur-tag` 默认禁用、每日 06:30 定时 + 手动 `POST /recur-tag` 触发（仅当使用「定期扣款」闭环时才需启用）；`bill-reminder` 默认禁用且当前模板未接发送节点、启用也不发邮件。所有流程的 webhook 密钥 `webhook_secret` 须与 §5.3 的 `WEBHOOK_SECRET` 及 Vikunja Webhook 的 Basic Auth 密码（或 URL 里的 `?secret=`）保持一致。
 
 ## 镜像版本锁定
 

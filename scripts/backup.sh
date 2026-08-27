@@ -13,6 +13,20 @@
 # =============================================================
 set -euo pipefail
 
+# ---------- 失败告警（第 8 项-A：备份任一步骤失败时推送，可选） ----------
+# 配置 TASKFIN_ALERT_URL（如 n8n 告警 webhook 地址）后，脚本以非 0 退出即 POST 一条告警；
+# 未配置则不发，不影响备份本身。也可改为发邮件，按你环境扩展。
+alert_on_failure() {
+  local msg="taskfin 备份失败 @ $(date '+%Y-%m-%d %H:%M:%S')，请检查 ${LOG_FILE:-备份日志}"
+  echo "🚨 $msg" >&2
+  if [ -n "${TASKFIN_ALERT_URL:-}" ]; then
+    curl -fsS -m 10 -X POST "$TASKFIN_ALERT_URL" \
+      -H 'Content-Type: application/json' \
+      -d "{\"text\":\"$msg\"}" >/dev/null 2>&1 || echo "  （告警推送失败，忽略）" >&2
+  fi
+}
+trap 'rc=$?; [ "$rc" -ne 0 ] && alert_on_failure' EXIT
+
 # ---------- 可配置区（按你环境修改） ----------
 # PROJECT_DIR 由脚本位置自动推导（脚本位于 <项目>/scripts/ 下），部署路径变更无需改这里。
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
