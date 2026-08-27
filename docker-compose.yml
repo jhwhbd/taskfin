@@ -10,17 +10,28 @@ networks:
 
 services:
   # ---- 唯一对公网开放 80/443 ----
+  # ⚠️ 安全：NPM 管理后台(81)与 ddns-go 管理后台(9876) 已绑定 127.0.0.1（仅本机回环），
+  #    不再暴露到 LAN/WAN（🔴2）。需从其他机器访问请改用 SSH 隧道，或显式改为 192.168.x.x:81:81。
   npm:
     image: jc21/nginx-proxy-manager:${NPM_VERSION}
     container_name: npm
     ports:
       - "80:80"
       - "443:443"
-      - "81:81"   # NPM 管理后台（仅内网，勿对公网/WAN 暴露）
+      # NPM 管理后台：仅绑定本机回环，禁止对 LAN/WAN 暴露（🔴2 / CVE-2026-40519 缓解）。
+      # 需从其他机器访问请用 SSH 隧道：ssh -L 81:127.0.0.1:81 user@nas，或改为 192.168.x.x:81:81 指定 LAN IP。
+      - "127.0.0.1:81:81"
     volumes:
       - ./data/npm/data:/data
       - ./data/npm/letsencrypt:/etc/letsencrypt
     restart: unless-stopped
+    # 🟡21 容器加固：禁止提权 + 丢弃全部 Linux capabilities；NPM 需绑定 80/443 故仅补回 NET_BIND_SERVICE。
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
     networks: [appnet]
 
   # ---- 动态 DNS（仅内网 :9876 管理）----
@@ -28,10 +39,17 @@ services:
     image: jeessy/ddns-go:${DDNS_VERSION}
     container_name: ddns-go
     ports:
-      - "9876:9876"
+      # ddns-go 管理后台：仅绑定本机回环（🔴2）。LAN 访问用 SSH 隧道或改指定 LAN IP。
+      - "127.0.0.1:9876:9876"
     volumes:
       - ./data/ddns-go:/root/.ddns-go
     restart: unless-stopped
+    # 🟡21 容器加固
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 128
     networks: [appnet]
 
   # ---- 任务管理 Vikunja（不发布主机端口，仅 NPM 内网反代）----
@@ -55,7 +73,7 @@ services:
     environment:
       VIKUNJA_DATABASE_TYPE: sqlite
       VIKUNJA_DATABASE_PATH: /db/vikunja.db
-      VIKUNJA_SERVICE_TIMEZONE: "Asia/Shanghai"
+      VIKUNJA_SERVICE_TIMEZONE: "${TZ}"
       # 对外访问地址（带 http(s)://，缺尾斜杠会由程序自动补）。
       # 影响邮件提醒里的任务链接、CalDAV 客户端发现、跨域(CORS)白名单。
       VIKUNJA_SERVICE_PUBLICURL: "https://tasks.${DOMAIN}/"
@@ -70,10 +88,13 @@ services:
       VIKUNJA_MAILER_FORCESSL: "true"
       VIKUNJA_MAILER_SKIPTLSVERIFY: "false"
     restart: unless-stopped
+    # 🟡21 容器加固
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     networks: [appnet]
     # 健康检查：vikunja 镜像是 scratch（无 shell/wget），用二进制自带的 healthcheck 子命令（检查 DB 连通性）。
-    # 注意：此处只加探针做状态展示与异常自动重启，未使用 depends_on: condition: service_healthy，
-    # 避免探针未就绪时阻塞依赖方启动。
     healthcheck:
       test: ["CMD", "/app/vikunja/vikunja", "healthcheck"]
       interval: 30s
@@ -98,7 +119,7 @@ services:
       - ./data/ezbookkeeping/data:/ezbookkeeping/data
       - ./data/ezbookkeeping/storage:/ezbookkeeping/storage
     environment:
-      TZ: Asia/Shanghai
+      TZ: "${TZ}"
       # 必改：随机密钥，群晖 SSH 执行 `openssl rand -base64 32`
       EBK_SECURITY_SECRET_KEY: "${EZB_SECRET_KEY}"
       # 开启 API Token（n8n 桥接必需）
@@ -122,6 +143,11 @@ services:
       # （拼接规则 EBK_<段>_<键>）；本快照 ini 已默认 true，此处显式声明使行为确定、不依赖 ini 默认值
       EBK_USER_ENABLE_SCHEDULED_TRANSACTION: "true"
     restart: unless-stopped
+    # 🟡21 容器加固
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     networks: [appnet]
     # 健康检查：ezBookkeeping 镜像基于 alpine，自带 busybox wget；/healthz.json 挂在根路由（无 /api/v1 前缀）、免认证。
     healthcheck:
@@ -132,18 +158,21 @@ services:
       start_period: 30s
 
   # ---- 自动化桥接 n8n（不发布主机端口）----
-  # 启动顺序：下方 depends_on 已声明依赖 vikunja / ezbookkeeping（见下方块，已生效、非注释）。首次启动 n8n 可能暂先于上游就绪，手动重跑一次触发器即可。
+  # 启动顺序：下方 depends_on 已改为「等待上游 healthcheck 通过」（condition: service_healthy），
+  # 避免 n8n 首次启动早于 Vikunja/ezBookkeeping 就绪。
   n8n:
     image: n8nio/n8n:${N8N_VERSION}
     container_name: n8n
     volumes:
       - ./data/n8n:/home/node/.n8n
     depends_on:
-      - vikunja
-      - ezbookkeeping
+      vikunja:
+        condition: service_healthy
+      ezbookkeeping:
+        condition: service_healthy
     environment:
-      TZ: "Asia/Shanghai"
-      GENERIC_TIMEZONE: "Asia/Shanghai"
+      TZ: "${TZ}"
+      GENERIC_TIMEZONE: "${TZ}"
       # n8n 1.x 用内置 Owner 账号（首次登录设密码），不再用 N8N_BASIC_AUTH
       # P3：经 NPM(HTTPS) 反代时，口令 Cookie 需 Secure 属性才能写入，否则登录反复跳转
       N8N_SECURE_COOKIE: "true"
@@ -153,6 +182,12 @@ services:
       # 之后修改会导致已有凭证/变量无法解密。
       N8N_ENCRYPTION_KEY: "${N8N_ENCRYPTION_KEY}"
     restart: unless-stopped
+    # 🟡21 容器加固
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 512
     networks: [appnet]
     # 健康检查：n8n 镜像基于 debian，优先用 curl、缺失时回退 wget；/healthz 在容器端口 5678 返回 200。
     healthcheck:

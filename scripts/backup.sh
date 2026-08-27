@@ -7,7 +7,7 @@
 #   3. ezBookkeeping 人读 CSV 导出 (可选，辅助查看)
 #   4. 高压缩：7z -mx=9 > tar.xz(-9) > tar.gz 自动降级
 #   5. 写入群晖 Windows 共享文件夹 taskfin_backup
-#   6. 仅保留最近 3 份
+#   6. 按 GFS 思路保留近期多份（KEEP_DAILY，默认 14）
 # 用法：群晖「控制面板 -> 任务计划 -> 用户自定义脚本」每周日 03:00 执行
 #       bash /path/to/taskfin/scripts/backup.sh   # 路径按脚本实际位置自动推导，无需硬编码
 # =============================================================
@@ -22,7 +22,9 @@ STAGING="$PROJECT_DIR/data/backup_staging"     # 临时落盘目录（已挂进 
 # 群晖共享文件夹在文件系统内的真实路径为 /volume1/<共享名>/<子目录>，
 # 请先在 DSM「控制面板 -> 共享文件夹」建好子目录（如 share/taskfin_backup），再把下面改成真实路径。
 # 注意：不要用旧版 DSM 的 /share/<名> 软链接别名，新版可能不存在，会静默写错位置。
-SMB_DIR="/volume1/share/taskfin_backup"
+SMB_DIR="${TASKFIN_BACKUP_DIR:-/volume1/share/taskfin_backup}"
+# 每种格式保留份数（GFS 思路：财务数据不宜只留 3 份；按日频≈保留 N 天）。可用 TASKFIN_KEEP_DAILY 覆盖。
+KEEP_DAILY="${TASKFIN_KEEP_DAILY:-14}"
 # 若要备份到别的机器的 Windows 共享：先群晖「文件服务 -> 挂载 CIFS」挂好，
 # 再把下面这行改成挂载点路径，例如 /volume1/@mount/CIFS/remote_backup
 # SMB_DIR="/volume1/@mount/CIFS/remote_backup"
@@ -64,6 +66,20 @@ for f in ezbookkeeping.db ezbookkeeping.db-wal ezbookkeeping.db-shm; do
 done
 [ "$copied" -gt 0 ] || echo "  警告：未找到 ezB db 文件，跳过"
 
+# P10：备份完整性自检 —— 用 sqlite3 对拷贝出的 ezB 主库做 integrity_check；
+# 失败仅告警不阻断（主备仍生成），但提示"备份可能不可恢复"。
+if command -v sqlite3 >/dev/null 2>&1; then
+  if [ -f "$STAGING/ezbookkeeping.db" ]; then
+    if sqlite3 "$STAGING/ezbookkeeping.db" "PRAGMA integrity_check;" | grep -q '^ok$'; then
+      echo "  ezB 数据库完整性检查通过 (integrity_check=ok)"
+    else
+      echo "  ⚠️ 警告：ezBookkeeping 数据库完整性检查未通过，备份可能损坏！" >&2
+    fi
+  fi
+else
+  echo "  （未安装 sqlite3，跳过 ezB 数据库完整性自检；建议宿主机安装 sqlite3 以便校验）"
+fi
+
 # 3) ezBookkeeping 人读 CSV（可选）
 # P9：ezB 镜像未必自带 wget；优先 wget，缺失则回退 curl（均走容器内访问，因 ezB 未映射主机端口）。
 # 前置条件：ezB 需开启 EBK_DATA_ENABLE_EXPORT=true 且 EZB_TOKEN 已填，否则该步自动跳过。
@@ -76,7 +92,7 @@ else
   echo "[3/4] 跳过 CSV 导出（EXPORT_CSV=0 或未填 EZB_TOKEN）"
 fi
 
-# 4) 高压缩 + 写入共享 + 仅留 3 份
+# 4) 高压缩 + 写入共享 + 按 KEEP_DAILY 留存
 echo "[4/4] 压缩并写入共享 ..."
 # P1-2：WAL 三件套一并归档（仅 *.db 会漏掉 -wal/-shm，导致未 checkpoint 时丢最近交易）
 FILES=( "$STAGING"/vikunja-*.zip "$STAGING"/*.db "$STAGING"/*.db-wal "$STAGING"/*.db-shm "$STAGING"/ezbookkeeping.csv )
@@ -105,10 +121,10 @@ else
 fi
 echo "  已生成: $ARCHIVE ($(du -h "$ARCHIVE" | cut -f1))"
 
-# 仅保留最近 3 份（P6：按扩展名分别保留，避免更换压缩工具后混合扩展名误删；用 while 读行而非 ls|xargs 分词，文件名安全）
-echo "  清理旧备份，每种格式仅留最近 3 份 ..."
+# 按 KEEP_DAILY 保留（GFS 思路；用 while 读行而非 ls|xargs 分词，文件名安全）
+echo "  清理旧备份，每种格式仅留最近 ${KEEP_DAILY} 份 ..."
 for ext in 7z tar.xz tgz; do
-  ls -t "$SMB_DIR"/taskfin-backup-*."$ext" 2>/dev/null | tail -n +4 | while IFS= read -r f; do
+  ls -t "$SMB_DIR"/taskfin-backup-*."$ext" 2>/dev/null | tail -n +$((KEEP_DAILY+1)) | while IFS= read -r f; do
     rm -f "$f"
   done
 done

@@ -10,7 +10,7 @@
 - **n8n** — automation bridge syncing tasks ↔ finance (create task → log budget; complete task → record actual spend; finance charge → write back to task).
 - **Nginx Proxy Manager** + **ddns-go** — HTTPS reverse proxy and dynamic DNS (Namecheap).
 
-**Architecture** — All three apps run inside the internal Docker network and talk to each other without leaving the LAN. Only ports **80/443** are exposed to the public internet (via NPM). Data is stored in **SQLite**; an automated `backup.sh` performs full backups with high compression and keeps only the 3 latest copies.
+**Architecture** — All three apps run inside the internal Docker network and talk to each other without leaving the LAN. Only ports **80/443** are exposed to the public internet (via NPM). Data is stored in **SQLite**; an automated `backup.sh` performs full backups with high compression and keeps the latest 14 copies (GFS-style retention).
 
 **Deploy** — `docker compose up -d` driven by environment variables (copy `.env.example` → `.env`). See [`docs/实施部署手册.md`](docs/实施部署手册.md) for the full step-by-step guide (Chinese). Upstream source is vendored under `vendor/` (Vikunja: AGPL-3.0, ezBookkeeping: MIT) and **rebranded to TaskFIN** (app name, icons, PWA splash screens) — the Vikunja & ezBookkeeping images are **built from this modified source** (not pulled from upstream registries). See [`vendor/SOURCES.md`](vendor/SOURCES.md).
 
@@ -51,7 +51,7 @@ taskfin/
 ├── README.md
 ├── LICENSE
 ├── scripts/
-│   ├── backup.sh           # 群晖任务计划用：全量备份 + 高压缩 + 仅留 3 份
+│   ├── backup.sh           # 群晖任务计划用：全量备份 + 高压缩 + 保留近期 14 份（GFS）
 │   ├── init.sh             # 部署后初始化：Vikunja 建首管理员（幂等可重跑）
 │   └── check-vendor.sh     # 比对 vendor/ 上游源码哈希与 GitHub 最新提交
 ├── n8n/                    # n8n 工作流导出（在 n8n 里 Import from File 导入；默认均禁用，按需启用）
@@ -105,8 +105,8 @@ docker compose up -d
 ⚠️ **WEBHOOK_SECRET 改 .env 不会自动生效**：`.env` 里的 `WEBHOOK_SECRET` 不被 compose 注入任何容器，仅当「n8n 变量 `webhook_secret` = Vikunja 两个 Webhook URL 末尾 `?secret=`」三处字符串完全一致时才生效。改 `.env` 后必须同步改这两处，否则 Auth Guard 会丢弃所有请求、桥接停摆。
 
 启动后：
-- NPM 管理后台 `http://<主机IP>:81`（仅内网，勿对公网开放）
-- ddns-go `http://<主机IP>:9876`（仅内网）
+- NPM 管理后台 `http://127.0.0.1:81`（已绑定本机回环，仅本机/SSH 隧道可访问；勿对 LAN/WAN 开放）
+- ddns-go `http://127.0.0.1:9876`（已绑定本机回环）
 - 应用通过 `tasks/fin/flow.<你的域名>` 经 HTTPS 访问
 
 详细部署、初始化、Webhook、n8n 配置、备份、移动端与已知风险，见 [`docs/实施部署手册.md`](docs/实施部署手册.md)；项目定位、功能、架构、设计决策与当前状态见 [`docs/项目介绍说明.md`](docs/项目介绍说明.md)。
@@ -124,7 +124,7 @@ docker compose up -d
 
 | 服务 | 镜像 | 当前锁定版本 |
 |---|---|---|
-| Nginx Proxy Manager | jc21/nginx-proxy-manager | v2.15.1 |
+| Nginx Proxy Manager | jc21/nginx-proxy-manager | v2.15.1 ⚠️CVE-2026-40519（受 RCE 影响，待上游出含修复的稳定版后升级；当前靠端口锁回环缓解） |
 | ddns-go | jeessy/ddns-go | v6.17.5 |
 | Vikunja | vikunja/vikunja | v2.5.0 | 从 `vendor/` 源码构建（版本仅记录，compose 不再拉此镜像） |
 | ezBookkeeping | mayswind/ezbookkeeping | v1.6.1 | 从 `vendor/` 源码构建（版本仅记录，compose 不再拉此镜像） |
