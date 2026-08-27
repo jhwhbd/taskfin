@@ -168,4 +168,10 @@ bash scripts/check-vendor.sh
 
 ## License
 
-本项目自身代码以 [MIT](LICENSE) 授权；`vendor/` 内各项目的许可证以其自带的 `LICENSE` 文件为准（Vikunja: AGPL-3.0 / ezBookkeeping: MIT）。
+本仓库（含自写脚本、文档、`docker-compose.yml`、n8n 工作流，以及针对 Vikunja / ezBookkeeping 前端的品牌化修改）整体以 **GNU Affero General Public License v3 (AGPL-3.0)** 授权，全文见 [LICENSE](LICENSE)。
+
+`vendor/` 内上游项目保留其各自许可证：
+- **Vikunja**：AGPL-3.0（见 `vendor/vikunja/LICENSE`）
+- **ezBookkeeping**：MIT（见 `vendor/ezbookkeeping/LICENSE`）
+
+第三方组件的署名与许可全文见 [NOTICE](NOTICE)。n8n 以 Docker 镜像方式拉取、不随本仓库分发，其 Sustainable Use License 仅约束 n8n 平台本身的使用（见上文 AGPL 义务提示与 NOTICE）。
