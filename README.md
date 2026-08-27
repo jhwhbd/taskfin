@@ -90,7 +90,8 @@ mkdir -p data/npm/data data/npm/letsencrypt data/ddns-go \
          data/vikunja/files data/vikunja/db \
          data/ezbookkeeping/data data/ezbookkeeping/storage \
          data/n8n data/backup_staging
-chown -R 1000:1000 data/ezbookkeeping/data data/ezbookkeeping/storage data/vikunja/files data/vikunja/db data/n8n data/backup_staging
+chown -R ${PUID:-1000}:${PGID:-1000} data/ezbookkeeping/data data/ezbookkeeping/storage data/vikunja/files data/vikunja/db data/n8n data/backup_staging
+# （PUID/PGID 见 .env；群晖 DSM 的 docker 用户 UID 通常不是 1000，权限报错时请改为 DSM 实际 UID:GID）
 
 # 3. 启动
 docker compose up -d

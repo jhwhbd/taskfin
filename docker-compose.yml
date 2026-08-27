@@ -114,7 +114,7 @@ services:
       context: ./vendor/ezbookkeeping
       dockerfile: Dockerfile
     container_name: ezbookkeeping
-    user: "1000:1000"
+    user: "${PUID:-1000}:${PGID:-1000}"
     volumes:
       - ./data/ezbookkeeping/data:/ezbookkeeping/data
       - ./data/ezbookkeeping/storage:/ezbookkeeping/storage
@@ -203,5 +203,6 @@ services:
 #          data/vikunja/files data/vikunja/db \
 #          data/ezbookkeeping/data data/ezbookkeeping/storage \
 #          data/n8n data/backup_staging
-# chown -R 1000:1000 data/ezbookkeeping/data data/ezbookkeeping/storage data/vikunja/files data/vikunja/db data/n8n data/backup_staging
+# chown -R ${PUID:-1000}:${PGID:-1000} data/ezbookkeeping/data data/ezbookkeeping/storage data/vikunja/files data/vikunja/db data/n8n data/backup_staging
+# （PUID/PGID 见 .env；群晖 DSM 的 docker 用户 UID 通常不是 1000，若启动报权限错请改为 DSM 实际 UID:GID）
 # docker compose up -d
