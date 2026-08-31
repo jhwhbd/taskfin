@@ -21,7 +21,7 @@ fi
 bad=0
 check() {
   local key="$1" val="$2" hint="$3"
-  if [ -z "$val" ] || printf '%s' "$val" | grep -qiE "yourdomain|10001|xxxx|replace-with|change-me|example"; then
+  if [ -z "$val" ] || printf '%s' "$val" | grep -qiE "yourdomain|10001\$|xxxx|replace-with|change-me|example"; then
     echo "  ⚠️  $key 疑似未修改占位符（$hint）"; bad=$((bad+1))
   else
     echo "  ✅ $key 已设置"

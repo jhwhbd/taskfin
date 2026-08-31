@@ -45,7 +45,10 @@ KEEP_DAILY="${TASKFIN_KEEP_DAILY:-14}"
 
 # ezBookkeeping CSV 导出（人读辅助，可选）。需 API Token。
 EXPORT_CSV=1
-EZB_TOKEN=""                                   # 填你的 ezB API Token（在 n8n 变量 ezb_token 同值）
+# EZB_TOKEN 从 .env 读取（与 n8n 变量 ezb_token 同值，统一配置源；见 .env.example 的 EZB_TOKEN）。
+# 未设置则跳过 CSV 导出。
+EZB_TOKEN="$(grep -E '^EZB_TOKEN=' "$PROJECT_DIR/.env" 2>/dev/null | head -1 | cut -d= -f2-)"
+EZB_TOKEN="${EZB_TOKEN:-}"
 # Vikunja dump 不需要 Token（走容器内部命令）
 
 LOG_FILE="$STAGING/backup.log"
@@ -64,7 +67,7 @@ echo "===== 备份开始 $TS ====="
 
 # 1) Vikunja 全量 dump -> 容器内 /backup -> 宿主机 STAGING
 echo "[1/4] Vikunja dump ..."
-docker exec vikunja sh -c "/app/vikunja/vikunja dump --path /backup" \
+docker exec vikunja /app/vikunja/vikunja dump --path /backup \
   || { echo "Vikunja dump 失败，退出"; exit 1; }
 
 # 2) ezBookkeeping 数据库文件

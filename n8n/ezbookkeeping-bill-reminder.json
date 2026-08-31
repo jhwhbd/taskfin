@@ -23,7 +23,7 @@
     },
     {
       "parameters": {
-        "notice": "账单临期提醒工作流：每日 09:00 拉取 ezB 近期交易，筛出含「待付/账单/缴费/续费」且非贷款分类的条目，聚合为一封邮件经 QQ SMTP 发出。\n前置：① 在 n8n 创建一个 SMTP 凭据（类型 smtp，命名 \"QQ SMTP\"），填 smtp.qq.com:465(SSL)、用户 <QQ_EMAIL>@qq.com、密码 <QQ_AUTH_CODE>；② 发件/收件地址取自 n8n 容器环境变量 $env.QQ_EMAIL。\n已在下方挂「Build Email Body」+「Send Email (QQ SMTP)」节点，启用即生效。",
+        "notice": "账单临期提醒工作流：每日 09:00 拉取 ezB 近期交易，筛出含「待付/账单/缴费/续费」且非贷款分类的条目，聚合为一封邮件经 QQ SMTP 发出。\n前置：① 在 n8n 创建一个 SMTP 凭据（类型 smtp，命名 \"QQ SMTP\"），填 smtp.qq.com:465(SSL)、用户 <QQ_EMAIL>@qq.com、密码 <QQ_AUTH_CODE>；② 发件/收件地址取自 n8n 变量 $vars.qq_email / $vars.mail_domain（两者拼接为完整地址；切换邮件服务商只需改 $vars.mail_domain，不再写死 @qq.com）。\n已在下方挂「Build Email Body」+「Send Email (QQ SMTP)」节点，启用即生效。",
         "notesInFlow": true
       },
       "id": "d2",
@@ -100,8 +100,8 @@
     },
     {
       "parameters": {
-        "fromEmail": "={{ $env.QQ_EMAIL }}@qq.com",
-        "toEmail": "={{ $env.QQ_EMAIL }}@qq.com",
+        "fromEmail": "={{ $vars.qq_email }}@{{ $vars.mail_domain }}",
+        "toEmail": "={{ $vars.qq_email }}@{{ $vars.mail_domain }}",
         "subject": "📅 账单到期提醒（TaskFIN）",
         "emailFormat": "html",
         "html": "={{ $json.html }}",

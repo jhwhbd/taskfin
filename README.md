@@ -86,7 +86,8 @@ git clone <your-repo-url> taskfin && cd taskfin
 
 # 1. 准备环境变量
 cp .env.example .env
-#   编辑 .env，填好 DOMAIN / QQ_EMAIL / QQ_AUTH_CODE / EZB_SECRET_KEY
+#   编辑 .env，填好 DOMAIN / QQ_EMAIL / QQ_AUTH_CODE / EZB_SECRET_KEY / WEBHOOK_SECRET / N8N_ENCRYPTION_KEY
+#   （可选）EZB_TOKEN：备份 CSV 人读导出用，不填则 backup.sh 跳过该步
 
 # 2. 建运行时数据目录
 mkdir -p data/npm/data data/npm/letsencrypt data/ddns-go \
@@ -107,7 +108,7 @@ docker compose up -d
 #   另：ezBookkeeping 周期/计划交易开关已在 docker-compose.yml 显式声明 EBK_USER_ENABLE_SCHEDULED_TRANSACTION=true（默认开启），否则周期交易无法建立、recur 闭环不工作
 ```
 
-⚠️ **WEBHOOK_SECRET 已单源化**：`.env` 的 `WEBHOOK_SECRET` 由 compose 注入 n8n 容器环境变量，三个工作流 Auth Guard 直接读 `$env.WEBHOOK_SECRET` 校验 `Authorization: Basic` 头——改 `.env` 后 `docker compose restart n8n` 即生效，**不再需要三处同步**。Vikunja Webhook 侧只需保证 **Basic Auth 密码**（或 URL 末尾 `?secret=`）与 `.env` 该值一致即可；旧的 `?secret=` 方式仍兼容（过渡期可并存）。
+⚠️ **WEBHOOK_SECRET 已单源化**：`.env` 的 `WEBHOOK_SECRET` 由 compose 注入 n8n 容器环境变量，三个工作流 Auth Guard 直接读 `$env.WEBHOOK_SECRET` 校验 `Authorization: Basic` 头——改 `.env` 后 `docker compose restart n8n` 即生效，**不再需要三处同步**。Vikunja Webhook 侧只需保证 **Basic Auth 密码**（或 URL 末尾 `?secret=`）与 `.env` 该值一致即可；旧的 `?secret=` 方式仍兼容（过渡期可并存）。**鉴权失败（密钥缺失/不匹配）现返回 HTTP 401**（而非原先的 200 空响应），便于发现伪造请求并让 Vikunja 正确重试。
 
 启动后：
 - NPM 管理后台 `http://127.0.0.1:81`（已绑定本机回环，仅本机/SSH 隧道可访问；勿对 LAN/WAN 开放）
@@ -115,6 +116,18 @@ docker compose up -d
 - 应用通过 `tasks.<你的域名>` / `fin.<你的域名>` / `flow.<你的域名>` 三个独立子域经 HTTPS 访问
 
 详细部署、初始化、Webhook、n8n 配置、备份、移动端与已知风险，见 [`docs/实施部署手册.md`](docs/实施部署手册.md)；项目定位、功能、架构、设计决策与当前状态见 [`docs/项目介绍说明.md`](docs/项目介绍说明.md)。
+
+## 运维脚本运行前置依赖
+
+`scripts/` 下的宿主机脚本依赖以下外部命令，部署前请确认群晖/目标主机已具备（群晖 DSM 默认可能不全）：
+
+| 脚本 | 依赖命令 | 说明 |
+|---|---|---|
+| `backup.sh` | `docker`、`7z`（或 `xz`/`tar` 降级）、`sqlite3`（完整性自检，缺失则跳过）、`curl`（失败告警推送）、容器内 `wget`/`curl`（ezB CSV，缺失则跳过） | 群晖「套件中心」装 SynoCommunity 的 7-Zip 可获得 `7z`；否则自动降级 xz→gzip，压缩率略低 |
+| `monitor.sh` | `docker`、`curl` | 探活 5 个容器并推送异常 |
+| `deploy.sh` / `init.sh` / `check-config.sh` / `check-vendor.sh` | `docker`、`curl`、`openssl` | 构建/初始化/自检 |
+
+> 若 `7z` 二进制名为 `7za`（SynoCommunity 装法不同），请将 `backup.sh` 中 `command -v 7z` 改为 `command -v 7za` 或建软链（见部署手册 §B4）。
 
 ## 已知最高风险（部署前必读）
 

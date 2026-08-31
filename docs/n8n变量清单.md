@@ -12,6 +12,8 @@
 | `ezb_account_cash_id` | n8n `Settings → Variables` | ezB 现金账户 ID（**字符串**） | `fund:...:cash` 任务记账的目标账户 `sourceAccountId` | task-sync |
 | `ezb_account_deposit_id` | n8n `Settings → Variables` | ezB 存款账户 ID（**字符串**） | `fund:...:deposit` 任务记账的目标账户 `sourceAccountId` | task-sync |
 | `ezb_cat_loan` | n8n `Settings → Variables` | ezB 贷款还款分类 ID（**字符串**，如 `"3"`） | `ezbookkeeping-bill-reminder` 引用 `{{ $vars.ezb_cat_loan }}` 识别「贷款还款」分类 | bill-reminder |
+| `qq_email` | n8n `Settings → Variables` | 发件/收件邮箱前缀（如 QQ 号），与 `mail_domain` 拼接为完整地址；对应 `.env` `QQ_EMAIL` | `ezbookkeeping-bill-reminder` 的 Send Email 节点 `fromEmail`/`toEmail` | bill-reminder |
+| `mail_domain` | n8n `Settings → Variables` | 邮件域名（如 `qq.com`/`163.com`），切换服务商只需改此项；对应 `.env` `MAIL_DOMAIN` | 与 `qq_email` 拼接为完整发信地址（不再写死 `@qq.com`） | bill-reminder |
 
 > ⚠️ **ID 字段必须按字符串发送**：ezB 源码中 `categoryId`、`sourceAccountId` 绑定为 `,string`（`json:"categoryId,string"`）。在 n8n 变量里填数字会被当成 JSON number 导致绑定失败（400）。务必填带引号的字符串（如 `"1"`）；当前流程用 `={{ $vars.xxx }}` 表达式，n8n 通常会以字符串发送，但若在变量 UI 里直接填了纯数字仍可能踩坑——请填字符串形式。
 
@@ -28,7 +30,7 @@
 ## 三、填写顺序建议
 
 1. 在 ezB / Vikunja 网页各生成一个 API Token。
-2. n8n `Settings → Variables` 新建上述 6 个变量，粘贴对应值（ID 类按字符串填）。
+2. n8n `Settings → Variables` 新建上述 8 个变量，粘贴对应值（ID 类按字符串填）。
 3. 在 `.env` 设置 `WEBHOOK_SECRET`（compose 会自动注入 n8n，Auth Guard 直接读取，无需在 n8n 建 `webhook_secret` 变量）；并确认 Vikunja 两个 Webhook 的 Basic Auth 密码（或 URL 末尾 `?secret=`）与此值一致。
 4. 导入 5 个 `n8n/*.json`，按需要 Enable（核心 3 个必开；recur-tag / bill-reminder 按需）。
 5. 逐步联调（见手册 §B2）：先手动「执行工作流」跑通，再启用 Webhook / 定时。
