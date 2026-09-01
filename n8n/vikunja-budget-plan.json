@@ -11,7 +11,7 @@
       "id": "c1",
       "name": "Vikunja Webhook (created)",
       "type": "n8n-nodes-base.webhook",
-      "typeVersion": 1.1,
+      "typeVersion": 2,
       "position": [
         250,
         300
@@ -20,12 +20,12 @@
     },
     {
       "parameters": {
-        "functionCode": "// P1 防御：校验 webhook 密钥（单源：WEBHOOK_SECRET 由 compose 注入 n8n 容器环境变量，不再依赖 n8n 内部变量）。\n// 优先 Authorization: Basic base64(taskfin:<secret>) 头（推荐，密钥不进 URL/日志）；\n// 兼容历史 ?secret= 查询参数（过渡期保留，配置 Vikunja Basic Auth 后从 URL 移除即可）。\n// D2：鉴权失败返回标记项（__unauthorized:true），由下游「Authorized?」IF 节点分流到「Respond 401」，\n//     使伪造/缺密钥请求回 HTTP 401（而非原先的 200 空响应），便于安全监控与上游重试。\nconst expected = process.env.WEBHOOK_SECRET || '';\nif (!expected) return [{ json: { __unauthorized: true, error: 'WEBHOOK_SECRET not configured' } }];\nconst h = ($input.item.json && $input.item.json.headers) || {};\nconst authHeader = h['authorization'] || h['Authorization'] || '';\nconst expectedBasic = 'Basic ' + Buffer.from('taskfin:' + expected).toString('base64');\nif (authHeader && authHeader === expectedBasic) return $input.all();\nconst q = ($input.item.json && $input.item.json.query) || {};\nconst got = q.secret || '';\nif (got && got === expected) return $input.all();\nreturn [{ json: { __unauthorized: true, error: 'Invalid or missing webhook secret' } }];"
+        "jsCode": "// P1 防御：校验 webhook 密钥（单源：WEBHOOK_SECRET 由 compose 注入 n8n 容器环境变量，不再依赖 n8n 内部变量）。\n// 优先 Authorization: Basic base64(taskfin:<secret>) 头（推荐，密钥不进 URL/日志）；\n// 兼容历史 ?secret= 查询参数（过渡期保留，配置 Vikunja Basic Auth 后从 URL 移除即可）。\n// D2：鉴权失败返回标记项（__unauthorized:true），由下游「Authorized?」IF 节点分流到「Respond 401」，\n//     使伪造/缺密钥请求回 HTTP 401（而非原先的 200 空响应），便于安全监控与上游重试。\nconst expected = process.env.WEBHOOK_SECRET || '';\nif (!expected) return [{ json: { __unauthorized: true, error: 'WEBHOOK_SECRET not configured' } }];\nconst h = ($input.item.json && $input.item.json.headers) || {};\nconst authHeader = h['authorization'] || h['Authorization'] || '';\nconst expectedBasic = 'Basic ' + Buffer.from('taskfin:' + expected).toString('base64');\nif (authHeader && authHeader === expectedBasic) return $input.all();\nconst q = ($input.item.json && $input.item.json.query) || {};\nconst got = q.secret || '';\nif (got && got === expected) return $input.all();\nreturn [{ json: { __unauthorized: true, error: 'Invalid or missing webhook secret' } }];"
       },
       "id": "c1b",
       "name": "Auth Guard (secret)",
-      "type": "n8n-nodes-base.function",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         430,
         300
@@ -33,12 +33,12 @@
     },
     {
       "parameters": {
-        "functionCode": "// 任务新建时，把 fund: 金额登记为「预算」（仅在 Vikunja 留痕，不写 ezB 真实支出）。\n// A1：预算/计划支出只作可见跟踪，不落 type=3，避免与「完成时记账」重复扣款（见 P2）。\nconst e = $input.item.json;\nif (e.event_name && e.event_name !== 'task.created') return [];\nconst task = (e.data && e.data.task) ? e.data.task : {};\nconst labels = (task.labels || []).map(l => (l.title || l).toString());\nconst m = labels.find(x => x.startsWith('fund:'));\nif (!m) return [];\nconst parts = m.slice(5).split(':');\nconst amount = parseFloat(parts[0]);\nif (Number.isNaN(amount)) return [];\nconst currency = parts[1] || 'CNY';\nconst account = parts[2] || 'cash';\nreturn [{\n  json: {\n    taskId: task.id,\n    title: task.title,\n    fund_amount: amount,\n    fund_currency: currency,\n    fund_account: account,\n    is_recur: labels.includes('recur')\n  }\n}];"
+        "jsCode": "// 任务新建时，把 fund: 金额登记为「预算」（仅在 Vikunja 留痕，不写 ezB 真实支出）。\n// A1：预算/计划支出只作可见跟踪，不落 type=3，避免与「完成时记账」重复扣款（见 P2）。\nconst e = $input.item.json;\nif (e.event_name && e.event_name !== 'task.created') return [];\nconst task = (e.data && e.data.task) ? e.data.task : {};\nconst labels = (task.labels || []).map(l => (l.title || l).toString());\nconst m = labels.find(x => x.startsWith('fund:'));\nif (!m) return [];\nconst parts = m.slice(5).split(':');\nconst amount = parseFloat(parts[0]);\nif (Number.isNaN(amount)) return [];\nconst currency = parts[1] || 'CNY';\nconst account = parts[2] || 'cash';\nreturn [{\n  json: {\n    taskId: task.id,\n    title: task.title,\n    fund_amount: amount,\n    fund_currency: currency,\n    fund_account: account,\n    is_recur: labels.includes('recur')\n  }\n}];"
       },
       "id": "c2",
       "name": "Parse Fund Label",
-      "type": "n8n-nodes-base.function",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         610,
         300
@@ -81,7 +81,7 @@
           "parameters": [
             {
               "name": "Authorization",
-              "value": "=Bearer {{ $vars.vikunja_token }}"
+              "value": "=Bearer {{ $env.VIKUNJA_TOKEN }}"
             },
             {
               "name": "Content-Type",
@@ -154,45 +154,17 @@
     },
     {
       "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true
-          },
-          "combinator": "and",
-          "conditions": [
-            {
-              "leftValue": "={{ $json.__unauthorized }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "equals"
-              }
-            }
-          ]
-        }
-      },
-      "id": "auth-if-bs",
-      "name": "Authorized?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
-        650,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "responseCode": 401,
+        "responseCode": 200,
         "responseMode": "json",
         "responseData": "firstEntryJson"
       },
-      "id": "auth-resp-bs",
-      "name": "Respond 401",
+      "id": "resp200",
+      "name": "Respond 200",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
       "position": [
-        650,
-        480
+        0,
+        0
       ]
     }
   ],
@@ -246,16 +218,12 @@
       "main": [
         [
           {
-            "node": "Parse Fund Label",
-            "type": "main",
-            "index": 0
+            "node": "Respond 401"
           }
         ],
         [
           {
-            "node": "Respond 401",
-            "type": "main",
-            "index": 0
+            "node": "Parse Fund Label"
           }
         ]
       ]
@@ -263,6 +231,15 @@
     "Respond 401": {
       "main": [
         []
+      ]
+    },
+    "Vikunja Budget Comment": {
+      "main": [
+        [
+          {
+            "node": "Respond 200"
+          }
+        ]
       ]
     }
   },

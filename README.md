@@ -125,7 +125,7 @@ docker compose up -d
 |---|---|---|
 | `backup.sh` | `docker`、`7z`（或 `xz`/`tar` 降级）、`sqlite3`（完整性自检，缺失则跳过）、`curl`（失败告警推送）、容器内 `wget`/`curl`（ezB CSV，缺失则跳过） | 群晖「套件中心」装 SynoCommunity 的 7-Zip 可获得 `7z`；否则自动降级 xz→gzip，压缩率略低 |
 | `monitor.sh` | `docker`、`curl` | 探活 5 个容器并推送异常 |
-| `deploy.sh` / `init.sh` / `check-config.sh` / `check-vendor.sh` | `docker`、`curl`、`openssl` | 构建/初始化/自检 |
+| `deploy.sh` / `init.sh` / `check-config.sh` / `check-vendor.sh` | `docker`、`curl`、`openssl`、`git`（`check-vendor.sh` 比对上游用 `git ls-remote`） | 构建/初始化/自检 |
 
 > 若 `7z` 二进制名为 `7za`（SynoCommunity 装法不同），请将 `backup.sh` 中 `command -v 7z` 改为 `command -v 7za` 或建软链（见部署手册 §B4）。
 
@@ -142,7 +142,7 @@ docker compose up -d
 2. **`fund:` 多币种解析未接入**：`fund_currency` 字段已在 task-sync 中解析，但 ezBookkeeping 建账**只用 CNY**，多币种场景暂不支持。
 3. **Vikunja webhook 不支持 HMAC 校验**：Vikunja 原生发 `X-Vikunja-Signature` 头，但 n8n 1.x 无法取原始 body 验 HMAC，故本方案改用 `Authorization: Basic` 头校验（密钥来自 `.env` 单源）。
 4. **`check-vendor.sh` 只比对 HEAD**：仅检查 vendor 上游 HEAD 是否前进，**不校验安全审查/合规状态**（脚本头部注释已声明）。
-5. **bill-reminder 模板**：仅过滤「到期且未勾掉」账单，未对贷款/订阅等特殊账单做排除（sticky 注释已提示）。
+5. **bill-reminder 模板**：按交易评论含「待付/账单/缴费/续费」筛选临期账单经邮件提醒；已显式按 `ezb_cat_loan`（贷款还款）分类排除贷款（仅跟踪、不提醒），但订阅类等非贷款特殊账单若评论命中上述关键词仍可能被提醒（如需更细粒度可扩展关键词或加分类排除）。
 
 ## 镜像版本锁定
 
@@ -170,7 +170,7 @@ bash scripts/check-vendor.sh
 
 ## 第三方源码与许可证
 
-本项目在 `vendor/` 下收录了所依赖的上游开源项目**完整源码快照**（保险副本，非日常运行依赖），以便在官方仓库/镜像不可用时仍可自包含构建。详细说明与更新方法见 [`vendor/SOURCES.md`](vendor/SOURCES.md)：
+本项目在 `vendor/` 下收录了所依赖的上游开源项目**完整源码快照**，并据此从源码构建品牌化镜像（即日常运行的构建源，而非仅保险副本）——官方仓库/镜像不可用时仍可自包含构建，平时 `docker-compose.yml` 也用 `build:` 直接构建它。详细说明与更新方法见 [`vendor/SOURCES.md`](vendor/SOURCES.md)：
 
 | 项目 | 上游 | 许可证 | 在本项目中的角色 |
 |---|---|---|---|

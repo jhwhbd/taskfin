@@ -9,9 +9,9 @@
 #       ezB 的 CLI 也不提供 set-setting 子命令，旧脚本里的对应步骤已移除。
 #
 # 仍需人工在网页完成的（本脚本替代不了，跑完会提示你）：
-#   - Vikunja 网页「设置 → API Tokens」新建 token，填 n8n 变量 vikunja_token
+#   - Vikunja 网页「设置 → API Tokens」新建 token，其值与 EZB_* 等写入 .env，由 compose 注入 n8n（$env.VIKUNJA_TOKEN 等；社区版不支持 n8n 内建 Variables，见部署手册 §5.3）
 #   - ezBookkeeping 网页注册账号、建「现金/存款」账户、建支出/贷款分类、
-#     生成 API Token，填 n8n 变量 ezb_*（见 docs/实施部署手册.md §5.2 / §5.3）
+#     生成 API Token，写入 .env 后由 compose 注入 n8n（$env.EZB_*，见部署手册 §5.2 / §5.3）
 #   - n8n 网页 Import 五个工作流 JSON（n8n/*.json）
 #
 # 用法（环境变量或位置参数均可）：
@@ -59,7 +59,7 @@ if [ -f "$ENV_FILE" ]; then
   }
   check_env "QQ_AUTH_CODE" "$_qq" "16 位 QQ 授权码"
   check_env "EZB_SECRET_KEY" "$_ezb" "openssl rand -base64 32 生成的随机密钥"
-  check_env "WEBHOOK_SECRET" "$_wh" "openssl rand -hex 16 生成的 webhook 密钥（需同步 n8n 变量 webhook_secret）"
+  check_env "WEBHOOK_SECRET" "$_wh" "openssl rand -hex 16 生成的 webhook 密钥（.env 设置后由 compose 注入 n8n，作为 \$env.WEBHOOK_SECRET，无需在 n8n 内单独建变量，见 check-config.sh 同步点 2）"
   echo "  校验完成（仅警告，不阻断）。"
 else
   echo "[0/1] 未找到 $ENV_FILE，跳过占位符校验（你可能在网页/环境变量中直接配置）。"
@@ -67,11 +67,21 @@ fi
 
 # ---------- 1) Vikunja 创建首管理员（部署手册 §5.1 CLI 兜底） ----------
 echo "[1/1] 创建 Vikunja 管理员账号 ($VIKUNJA_ADMIN_USER / $EZB_ADMIN_EMAIL) ..."
-OUT=$(docker exec vikunja /app/vikunja/vikunja user create \
-  --username "$VIKUNJA_ADMIN_USER" \
-  --email "$EZB_ADMIN_EMAIL" \
-  --password "$EZB_ADMIN_PASS" 2>&1)
-RC=$?
+# 安全说明（#18，审计修复）：不把密码作为命令行参数传给 docker exec，
+# 否则会落入宿主机 /proc/<pid>/cmdline（任意本地用户 `ps` 可见）。
+# 当前构建的 user create 在缺省 --password 时，会从 TTY 交互式读取两次密码
+#（见 vendor/vikunja/pkg/cmd/user.go 的 getPasswordFromFlagOrInput，
+# 使用 term.ReadPassword(os.Stdin.Fd())）。故用 -it 分配伪终端，并通过
+# bash 内建 printf 把两行相同密码喂入 stdin——密码仅存于本进程内存，
+# 不落盘、不进外部进程 argv。set +e 包住以正确捕获 docker 的返回码。
+set +e
+OUT=$(printf '%s\n%s\n' "$EZB_ADMIN_PASS" "$EZB_ADMIN_PASS" \
+  | docker exec -i -t vikunja /app/vikunja/vikunja user create \
+      --username "$VIKUNJA_ADMIN_USER" \
+      --email "$EZB_ADMIN_EMAIL" 2>&1 \
+  | sed 's/\r$//')
+RC=${PIPESTATUS[1]}
+set -e
 if [ $RC -eq 0 ]; then
   echo "  完成（账号 $VIKUNJA_ADMIN_USER 已创建或已存在）。"
 elif echo "$OUT" | grep -qiE "already|exist|已存在"; then
@@ -83,7 +93,7 @@ fi
 echo "===== 初始化 CLI 步骤完成 ====="
 echo "接下来请人工完成（网页）："
 echo "  1. Vikunja 设置→API Tokens 新建，填 n8n 变量 vikunja_token"
-echo "  2. ezBookkeeping 注册/建账户/建分类/生成 Token，填 n8n 变量 ezb_*"
+echo "  2. ezBookkeeping 注册/建账户/建分类/生成 Token，写入 .env 后由 compose 注入 n8n（\$env.EZB_*）"
 echo "     （公开注册已由 compose 默认关闭，无需额外 CLI 操作）"
 echo "  3. n8n 导入 n8n/*.json 五个工作流"
 

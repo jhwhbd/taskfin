@@ -11,7 +11,7 @@
       "id": "a1",
       "name": "Vikunja Webhook",
       "type": "n8n-nodes-base.webhook",
-      "typeVersion": 1.1,
+      "typeVersion": 2,
       "position": [
         250,
         300
@@ -20,12 +20,12 @@
     },
     {
       "parameters": {
-        "functionCode": "// P1 防御：校验 webhook 密钥（单源：WEBHOOK_SECRET 由 compose 注入 n8n 容器环境变量，不再依赖 n8n 内部变量）。\n// 优先 Authorization: Basic base64(taskfin:<secret>) 头（推荐，密钥不进 URL/日志）；\n// 兼容历史 ?secret= 查询参数（过渡期保留，配置 Vikunja Basic Auth 后从 URL 移除即可）。\n// D2：鉴权失败返回标记项（__unauthorized:true），由下游「Authorized?」IF 节点分流到「Respond 401」，\n//     使伪造/缺密钥请求回 HTTP 401（而非原先的 200 空响应），便于安全监控与上游重试。\nconst expected = process.env.WEBHOOK_SECRET || '';\nif (!expected) return [{ json: { __unauthorized: true, error: 'WEBHOOK_SECRET not configured' } }];\nconst h = ($input.item.json && $input.item.json.headers) || {};\nconst authHeader = h['authorization'] || h['Authorization'] || '';\nconst expectedBasic = 'Basic ' + Buffer.from('taskfin:' + expected).toString('base64');\nif (authHeader && authHeader === expectedBasic) return $input.all();\nconst q = ($input.item.json && $input.item.json.query) || {};\nconst got = q.secret || '';\nif (got && got === expected) return $input.all();\nreturn [{ json: { __unauthorized: true, error: 'Invalid or missing webhook secret' } }];"
+        "jsCode": "// P1 防御：校验 webhook 密钥（单源：WEBHOOK_SECRET 由 compose 注入 n8n 容器环境变量，不再依赖 n8n 内部变量）。\n// 优先 Authorization: Basic base64(taskfin:<secret>) 头（推荐，密钥不进 URL/日志）；\n// 兼容历史 ?secret= 查询参数（过渡期保留，配置 Vikunja Basic Auth 后从 URL 移除即可）。\n// D2：鉴权失败返回标记项（__unauthorized:true），由下游「Authorized?」IF 节点分流到「Respond 401」，\n//     使伪造/缺密钥请求回 HTTP 401（而非原先的 200 空响应），便于安全监控与上游重试。\nconst expected = process.env.WEBHOOK_SECRET || '';\nif (!expected) return [{ json: { __unauthorized: true, error: 'WEBHOOK_SECRET not configured' } }];\nconst h = ($input.item.json && $input.item.json.headers) || {};\nconst authHeader = h['authorization'] || h['Authorization'] || '';\nconst expectedBasic = 'Basic ' + Buffer.from('taskfin:' + expected).toString('base64');\nif (authHeader && authHeader === expectedBasic) return $input.all();\nconst q = ($input.item.json && $input.item.json.query) || {};\nconst got = q.secret || '';\nif (got && got === expected) return $input.all();\nreturn [{ json: { __unauthorized: true, error: 'Invalid or missing webhook secret' } }];"
       },
       "id": "a1b",
       "name": "Auth Guard (secret)",
-      "type": "n8n-nodes-base.function",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         430,
         300
@@ -33,12 +33,12 @@
     },
     {
       "parameters": {
-        "functionCode": "// 解析 Vikunja webhook 载荷，提取标签中的 fund:/res:/deliv:/milestone\nconst e = $input.item.json;\nconst evt = e.event_name;\nconst task = (e.data && e.data.task) ? e.data.task : {};\nconst labels = (task.labels || []).map(l => (l.title || l).toString());\nfunction parseLabel(prefix){\n  const m = labels.find(x => x.startsWith(prefix + ':'));\n  return m ? m.slice(prefix.length + 1) : null;\n}\nconst fund = parseLabel('fund');\nif (!fund) return []; // 无 fund: 标签则不建账\nlet amount = null, currency = 'CNY', account = 'cash';\nconst parts = fund.split(':');\namount = parseFloat(parts[0]);\nif (Number.isNaN(amount)) return []; // 标签格式错误 → 跳过，避免 NaN/¥0 建账\nif (parts[1]) currency = parts[1];\nif (parts[2]) account = parts[2];\nreturn [{\n  json: {\n    event_name: evt,\n    taskId: task.id,\n    projectId: task.project_id,\n    title: task.title,\n    done: !!task.done,\n    labels: labels,\n    fund_amount: amount,\n    fund_currency: currency,\n    fund_account: account,\n    is_recur: labels.includes('recur'),\n    res: parseLabel('res'),\n    deliv: parseLabel('deliv'),\n    is_milestone: labels.includes('milestone')\n  }\n}];"
+        "jsCode": "// 解析 Vikunja webhook 载荷，提取标签中的 fund:/res:/deliv:/milestone\nconst e = $input.item.json;\nconst evt = e.event_name;\nconst task = (e.data && e.data.task) ? e.data.task : {};\nconst labels = (task.labels || []).map(l => (l.title || l).toString());\nfunction parseLabel(prefix){\n  const m = labels.find(x => x.startsWith(prefix + ':'));\n  return m ? m.slice(prefix.length + 1) : null;\n}\nconst fund = parseLabel('fund');\nif (!fund) return []; // 无 fund: 标签则不建账\nlet amount = null, currency = 'CNY', account = 'cash';\nconst parts = fund.split(':');\namount = parseFloat(parts[0]);\nif (Number.isNaN(amount)) return []; // 标签格式错误 → 跳过，避免 NaN/¥0 建账\nif (parts[1]) currency = parts[1];\nif (parts[2]) account = parts[2];\nreturn [{\n  json: {\n    event_name: evt,\n    taskId: task.id,\n    projectId: task.project_id,\n    title: task.title,\n    done: !!task.done,\n    labels: labels,\n    fund_amount: amount,\n    fund_currency: currency,\n    fund_account: account,\n    is_recur: labels.includes('recur'),\n    res: parseLabel('res'),\n    deliv: parseLabel('deliv'),\n    is_milestone: labels.includes('milestone')\n  }\n}];"
       },
       "id": "a2",
       "name": "Parse Labels",
-      "type": "n8n-nodes-base.function",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         610,
         300
@@ -90,7 +90,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// P2 防重发护栏：若任务评论里已有「已自动记账」回执（含 #auto-<taskId>），说明本次/历史已完成真实记账，\n// 跳过，避免编辑已完成任务、或取消完成后再完成导致重复记 type=3 真实支出。\nconst taskId = $json.taskId;\nconst auth = 'Bearer ' + $vars.vikunja_token;\nconst base = 'http://vikunja:3456/api/v1';\ntry {\n  const resp = await this.helpers.httpRequest({ method:'GET', url: base + '/tasks/' + taskId + '/comments', headers:{Authorization:auth,'Content-Type':'application/json'}, json:true });\n  const comments = Array.isArray(resp) ? resp : (resp.comments || []);\n  const marker = '#auto-' + taskId;\n  const already = comments.some(c => { const t = (c.comment || c.text || ''); return t.includes('已自动记账到 ezBookkeeping') || t.includes(marker); });\n  return [{ json: { ...$json, alreadyAccounted: already } }];\n} catch (e) {\n  // 取评论失败：保守放行（仍记账），避免漏记真实支出；异常仅记录\n  return [{ json: { ...$json, alreadyAccounted: false, commentCheckError: (e && e.message) ? e.message : String(e) } }];\n}"
+        "jsCode": "// P2 防重发护栏：若任务评论里已有「已自动记账」回执（含 #auto-<taskId>），说明本次/历史已完成真实记账，\n// 跳过，避免编辑已完成任务、或取消完成后再完成导致重复记 type=3 真实支出。\nconst taskId = $json.taskId;\nconst auth = 'Bearer ' + $env.VIKUNJA_TOKEN;\nconst base = 'http://vikunja:3456/api/v1';\ntry {\n  const resp = await this.helpers.httpRequest({ method:'GET', url: base + '/tasks/' + taskId + '/comments', headers:{Authorization:auth,'Content-Type':'application/json'}, json:true });\n  const comments = Array.isArray(resp) ? resp : (resp.comments || []);\n  const marker = '#auto-' + taskId;\n  const already = comments.some(c => { const t = (c.comment || c.text || ''); return t.includes('已自动记账到 ezBookkeeping') || t.includes(marker); });\n  return [{ json: { ...$json, alreadyAccounted: already } }];\n} catch (e) {\n  // 取评论失败：保守放行（仍记账），避免漏记真实支出；异常仅记录\n  return [{ json: { ...$json, alreadyAccounted: false, commentCheckError: (e && e.message) ? e.message : String(e) } }];\n}"
       },
       "id": "a3b",
       "name": "Check Accounted",
@@ -107,11 +107,11 @@
           "options": {
             "caseSensitive": true
           },
-          "combinator": "or",
+          "combinator": "and",
           "conditions": [
             {
               "leftValue": "={{ $json.alreadyAccounted }}",
-              "rightValue": true,
+              "rightValue": false,
               "operator": {
                 "type": "boolean",
                 "operation": "equals"
@@ -119,7 +119,7 @@
             },
             {
               "leftValue": "={{ $json.alreadyInEzb }}",
-              "rightValue": true,
+              "rightValue": false,
               "operator": {
                 "type": "boolean",
                 "operation": "equals"
@@ -146,7 +146,7 @@
           "parameters": [
             {
               "name": "Authorization",
-              "value": "=Bearer {{ $vars.ezb_token }}"
+              "value": "=Bearer {{ $env.EZB_TOKEN }}"
             },
             {
               "name": "Content-Type",
@@ -168,7 +168,7 @@
             },
             {
               "name": "categoryId",
-              "value": "={{ $vars.ezb_cat_expense }}"
+              "value": "={{ $env.EZB_CAT_EXPENSE }}"
             },
             {
               "name": "time",
@@ -180,7 +180,7 @@
             },
             {
               "name": "sourceAccountId",
-              "value": "={{ $json.fund_account === 'deposit' ? $vars.ezb_account_deposit_id : $vars.ezb_account_cash_id }}"
+              "value": "={{ $json.fund_account === 'deposit' ? $env.EZB_ACCOUNT_DEPOSIT_ID : $env.EZB_ACCOUNT_CASH_ID }}"
             },
             {
               "name": "sourceAmount",
@@ -211,7 +211,7 @@
           "parameters": [
             {
               "name": "Authorization",
-              "value": "=Bearer {{ $vars.vikunja_token }}"
+              "value": "=Bearer {{ $env.VIKUNJA_TOKEN }}"
             },
             {
               "name": "Content-Type",
@@ -241,7 +241,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// P2 增强：创建 ezB 支出前，先查 ezB 自身是否已有含 #auto-<taskId> 的支出，\n// 关闭「先记 ezB、后写 Vikunja 评论」崩溃窗口导致的重复记账。\nconst taskId = $json.taskId;\nconst auth = 'Bearer ' + $vars.ezb_token;\nconst base = 'http://ezbookkeeping:8080/api/v1';\ntry {\n  const resp = await this.helpers.httpRequest({\n    method: 'GET',\n    url: base + '/transactions/list.json?count=100',\n    headers: { Authorization: auth, 'Content-Type': 'application/json', 'X-Timezone-Name': (typeof $env !== 'undefined' && $env && $env.TZ ? $env.TZ : 'Asia/Shanghai') },\n    json: true\n  });\n  const result = (resp && resp.result) || resp || {};\n  const items = Array.isArray(result) ? result : (result.items || []);\n  const marker = '#auto-' + taskId;\n  const exists = items.some(t => (t.comment || '').includes(marker));\n  return [{ json: { ...$json, alreadyInEzb: exists } }];\n} catch (e) {\n  return [{ json: { ...$json, alreadyInEzb: false, ezbCheckError: (e && e.message) ? e.message : String(e) } }];\n}"
+        "jsCode": "// P2 增强：创建 ezB 支出前，先查 ezB 自身是否已有含 #auto-<taskId> 的支出，\n// 关闭「先记 ezB、后写 Vikunja 评论」崩溃窗口导致的重复记账。\nconst taskId = $json.taskId;\nconst auth = 'Bearer ' + $env.EZB_TOKEN;\nconst base = 'http://ezbookkeeping:8080/api/v1';\ntry {\n  const resp = await this.helpers.httpRequest({\n    method: 'GET',\n    url: base + '/transactions/list.json?count=100',\n    headers: { Authorization: auth, 'Content-Type': 'application/json', 'X-Timezone-Name': (typeof $env !== 'undefined' && $env && $env.TZ ? $env.TZ : 'Asia/Shanghai') },\n    json: true\n  });\n  const result = (resp && resp.result) || resp || {};\n  const items = Array.isArray(result) ? result : (result.items || []);\n  const marker = '#auto-' + taskId;\n  const exists = items.some(t => (t.comment || '').includes(marker));\n  return [{ json: { ...$json, alreadyInEzb: exists } }];\n} catch (e) {\n  return [{ json: { ...$json, alreadyInEzb: false, ezbCheckError: (e && e.message) ? e.message : String(e) } }];\n}"
       },
       "id": "a3d",
       "name": "ezB Check Existing",
@@ -297,45 +297,17 @@
     },
     {
       "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true
-          },
-          "combinator": "and",
-          "conditions": [
-            {
-              "leftValue": "={{ $json.__unauthorized }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "equals"
-              }
-            }
-          ]
-        }
-      },
-      "id": "auth-if-ts",
-      "name": "Authorized?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
-        650,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "responseCode": 401,
+        "responseCode": 200,
         "responseMode": "json",
         "responseData": "firstEntryJson"
       },
-      "id": "auth-resp-ts",
-      "name": "Respond 401",
+      "id": "resp200",
+      "name": "Respond 200",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
       "position": [
-        650,
-        480
+        0,
+        0
       ]
     }
   ],
@@ -434,16 +406,12 @@
       "main": [
         [
           {
-            "node": "Parse Labels",
-            "type": "main",
-            "index": 0
+            "node": "Respond 401"
           }
         ],
         [
           {
-            "node": "Respond 401",
-            "type": "main",
-            "index": 0
+            "node": "Parse Labels"
           }
         ]
       ]
@@ -451,6 +419,15 @@
     "Respond 401": {
       "main": [
         []
+      ]
+    },
+    "Vikunja Comment Back": {
+      "main": [
+        [
+          {
+            "node": "Respond 200"
+          }
+        ]
       ]
     }
   },

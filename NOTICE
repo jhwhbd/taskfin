@@ -43,3 +43,16 @@ taskfin — 第三方组件许可声明 (Third-Party Licenses)
    说明:   n8n 以 Docker 镜像方式拉取，不随本仓库分发；本仓库中的 n8n 工作流
           JSON 为用户自行创作的内容，不受 n8n 平台许可证约束。n8n 平台许可证
           仅约束对 n8n 软件本身的使用（详见 https://docs.n8n.io/sustainable-use-license/）。
+
+
+4. Open Sans 字体（品牌图标生成用）
+   许可证: SIL Open Font License 1.1（OFL-1.1，非 Apache-2.0）
+   版权:   Copyright (c) Google LLC
+   位置:   branding/fonts/OpenSans-SemiBold.ttf
+   说明:   Open Sans 由 Google 以 SIL OFL-1.1 发布（scripts/gen-icons.cjs 旧注释
+          误写为 Apache-2.0，已更正）。gen-icons.cjs 用 opentype.js 把文字转成
+          矢量路径后栅格化，最终图标产物（branding/ 下 SVG/PNG/ico）不含字体
+          文件本身；OFL-1.1 允许在作品中自由使用、修改与再分发该字体，但须保留
+          版权声明与许可文本。本仓库仅分发由字体生成的图标，不构成对字体许可
+          的额外约束。
+   文本:   https://openfontlicense.org/

@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install validators
+        run: pip install --no-cache-dir pyyaml
+
+      # [1] Shell 脚本语法检查（set -euo pipefail 下改坏会在 CI 提前暴露）
+      - name: Lint shell scripts (bash -n)
+        run: |
+          shopt -s nullglob
+          fail=0
+          for f in scripts/*.sh; do
+            if bash -n "$f"; then echo "OK   $f"; else echo "FAIL $f"; fail=1; fi
+          done
+          exit $fail
+
+      # [2] n8n 工作流 JSON 合法性 + 回归守卫（$vars. 单源化后不得回潮）
+      - name: Validate n8n workflow JSON
+        run: |
+          python - <<'PY'
+          import json, glob, sys
+          ok = True
+          for f in sorted(glob.glob('n8n/*.json')):
+              with open(f, encoding='utf-8') as fh:
+                  data = json.load(fh)  # 解析失败即格式错误
+              txt = json.dumps(data, ensure_ascii=False)
+              if '$vars.' in txt:
+                  print(f"REGRESSION: $vars. 残留于 {f}"); ok = False
+          print("n8n JSON 校验通过" if ok else "n8n JSON 校验失败")
+          sys.exit(0 if ok else 1)
+          PY
+
+      # [3] docker-compose.yml 合法性
+      - name: Validate docker-compose.yml
+        run: python -c "import yaml; yaml.safe_load(open('docker-compose.yml', encoding='utf-8')); print('compose 校验通过')"
+
+      # [4] 信息性：?secret= 兼容段是否仍存在（删除前不视为失败，仅提示）
+      - name: Note ?secret= compat presence
+        run: |
+          if grep -rq "q.secret" n8n/; then
+            echo "INFO: n8n 工作流仍保留 ?secret= 兼容段（过渡期，删除前属正常）"
+          else
+            echo "INFO: 未发现 ?secret= 兼容段"
+          fi

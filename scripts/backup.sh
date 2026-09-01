@@ -25,7 +25,7 @@ alert_on_failure() {
       -d "{\"text\":\"$msg\"}" >/dev/null 2>&1 || echo "  （告警推送失败，忽略）" >&2
   fi
 }
-trap 'rc=$?; [ "$rc" -ne 0 ] && alert_on_failure' EXIT
+trap 'rc=$?; rm -f "$STAGING"/vikunja-*.zip "$STAGING"/*.db "$STAGING"/*.db-wal "$STAGING"/*.db-shm "$STAGING"/ezbookkeeping.csv "$STAGING"/env-manifest.txt 2>/dev/null; rm -rf "$STAGING"/config 2>/dev/null; [ "$rc" -ne 0 ] && alert_on_failure' EXIT
 
 # ---------- 可配置区（按你环境修改） ----------
 # PROJECT_DIR 由脚本位置自动推导（脚本位于 <项目>/scripts/ 下），部署路径变更无需改这里。
@@ -83,6 +83,29 @@ for f in ezbookkeeping.db ezbookkeeping.db-wal ezbookkeeping.db-shm; do
 done
 [ "$copied" -gt 0 ] || echo "  警告：未找到 ezB db 文件，跳过"
 
+# 2b) 配置目录快照（n8n / NPM / ddns-go）：拷进 STAGING 一并归档（#7）
+#     n8n 含工作流与加密凭证；NPM 含反代配置与 Let's Encrypt 证书；ddns-go 含配置。
+#     ⚠️ 凭证由 N8N_ENCRYPTION_KEY 加密，迁移时需该密钥 + n8n 卷一并带走。
+echo "[2b/4] 拷贝配置目录（n8n / NPM / ddns-go）..."
+mkdir -p "$STAGING"/config
+cp -a "$PROJECT_DIR/data/n8n" "$STAGING/config/n8n" 2>/dev/null || echo "  警告：拷贝 n8n 配置失败（可能尚未部署）"
+cp -a "$PROJECT_DIR/data/npm/data" "$STAGING/config/npm" 2>/dev/null || echo "  警告：拷贝 NPM 配置失败（可能尚未部署）"
+cp -a "$PROJECT_DIR/data/ddns-go" "$STAGING/config/ddns-go" 2>/dev/null || echo "  警告：拷贝 ddns-go 配置失败（可能尚未部署）"
+
+# 2c) .env 校验清单（D2-A：.env 含密钥，不纳入备份；仅留键名 + 校验和，不含明文值）
+echo "[2c/4] 生成 .env 校验清单（仅键名 + 校验和，不含明文值）..."
+if [ -f "$PROJECT_DIR/.env" ]; then
+  ENV_CHK="$(sha256sum "$PROJECT_DIR/.env" 2>/dev/null | awk '{print $1}')"
+  [ -z "$ENV_CHK" ] && ENV_CHK="$(cksum "$PROJECT_DIR/.env" 2>/dev/null | awk '{print $1}')"
+  {
+    echo "# taskfin 备份随附 .env 校验清单（不含明文值，仅键名 + 校验和，详见 D2-A）"
+    echo "generated=$(date +%Y%m%d-%H%M%S)"
+    echo "checksum=$ENV_CHK"
+    echo "--- keys (值不入库) ---"
+    grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "$PROJECT_DIR/.env" 2>/dev/null | sed -E 's/=.*//' | sort
+  } > "$STAGING/env-manifest.txt"
+fi
+
 # P10：备份完整性自检 —— 用 sqlite3 对拷贝出的 ezB 主库做 integrity_check；
 # 失败仅告警不阻断（主备仍生成），但提示"备份可能不可恢复"。
 if command -v sqlite3 >/dev/null 2>&1; then
@@ -115,7 +138,7 @@ fi
 # 4) 高压缩 + 写入共享 + 按 KEEP_DAILY 留存
 echo "[4/4] 压缩并写入共享 ..."
 # P1-2：WAL 三件套一并归档（仅 *.db 会漏掉 -wal/-shm，导致未 checkpoint 时丢最近交易）
-FILES=( "$STAGING"/vikunja-*.zip "$STAGING"/*.db "$STAGING"/*.db-wal "$STAGING"/*.db-shm "$STAGING"/ezbookkeeping.csv )
+FILES=( "$STAGING"/vikunja-*.zip "$STAGING"/*.db "$STAGING"/*.db-wal "$STAGING"/*.db-shm "$STAGING"/ezbookkeeping.csv "$STAGING"/config "$STAGING"/env-manifest.txt )
 # 去掉不存在的项；同时取出文件名（供 tar -C 使用，避免 ls 命令替换对含空格文件名分词出错）
 existing=()
 for f in "${FILES[@]}"; do [ -e "$f" ] && existing+=("$f"); done
@@ -143,15 +166,21 @@ echo "  已生成: $ARCHIVE ($(du -h "$ARCHIVE" | cut -f1))"
 
 # 按 KEEP_DAILY 保留（GFS 思路；用 while 读行而非 ls|xargs 分词，文件名安全）
 echo "  清理旧备份，每种格式仅留最近 ${KEEP_DAILY} 份 ..."
+# 用 nullglob + 数组，避免某格式无匹配文件时 `ls` 退出码非零在 set -euo pipefail 下中断脚本（#6）
+shopt -s nullglob
 for ext in 7z tar.xz tgz; do
-  ls -t "$SMB_DIR"/taskfin-backup-*."$ext" 2>/dev/null | tail -n +$((KEEP_DAILY+1)) | while IFS= read -r f; do
-    rm -f "$f"
+  files=("$SMB_DIR"/taskfin-backup-*."$ext")
+  [ ${#files[@]} -eq 0 ] && continue
+  # 按修改时间倒序，删掉第 KEEP_DAILY+1 份及更旧
+  old=($(ls -t "${files[@]}"))
+  for ((i=KEEP_DAILY; i<${#old[@]}; i++)); do
+    rm -f "${old[i]}"
   done
 done
+shopt -u nullglob
 echo "  当前共享内备份："
 ls -lh "$SMB_DIR"/taskfin-backup-*.* 2>/dev/null | awk '{print $5, $9}'
 
-# 清理本次临时文件
-rm -f "$STAGING"/vikunja-*.zip "$STAGING"/*.db "$STAGING"/*.db-wal "$STAGING"/*.db-shm "$STAGING"/ezbookkeeping.csv 2>/dev/null || true
+# 临时文件清理已由脚本 EXIT trap 统一处理（含失败时也清理，#6），此处不再重复。
 
 echo "===== 备份完成 $(date +%Y%m%d-%H%M%S) ====="

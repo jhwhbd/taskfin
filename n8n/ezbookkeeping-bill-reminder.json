@@ -23,7 +23,7 @@
     },
     {
       "parameters": {
-        "notice": "账单临期提醒工作流：每日 09:00 拉取 ezB 近期交易，筛出含「待付/账单/缴费/续费」且非贷款分类的条目，聚合为一封邮件经 QQ SMTP 发出。\n前置：① 在 n8n 创建一个 SMTP 凭据（类型 smtp，命名 \"QQ SMTP\"），填 smtp.qq.com:465(SSL)、用户 <QQ_EMAIL>@qq.com、密码 <QQ_AUTH_CODE>；② 发件/收件地址取自 n8n 变量 $vars.qq_email / $vars.mail_domain（两者拼接为完整地址；切换邮件服务商只需改 $vars.mail_domain，不再写死 @qq.com）。\n已在下方挂「Build Email Body」+「Send Email (QQ SMTP)」节点，启用即生效。",
+        "notice": "账单临期提醒工作流：每日 09:00 拉取 ezB 近期交易，筛出含「待付/账单/缴费/续费」且非贷款分类的条目，聚合为一封邮件经 QQ SMTP 发出。\n前置：① 在 n8n 创建一个 SMTP 凭据（类型 smtp，命名 \"QQ SMTP\"），填 smtp.qq.com:465(SSL)、用户 <QQ_EMAIL>@qq.com、密码 <QQ_AUTH_CODE>；② 发件/收件地址取自 n8n 变量 $env.QQ_EMAIL / $env.MAIL_DOMAIN（两者拼接为完整地址；切换邮件服务商只需改 $env.MAIL_DOMAIN，不再写死 @qq.com）。\n已在下方挂「Build Email Body」+「Send Email (QQ SMTP)」节点，启用即生效。",
         "notesInFlow": true
       },
       "id": "d2",
@@ -46,7 +46,7 @@
           "parameters": [
             {
               "name": "Authorization",
-              "value": "=Bearer {{ $vars.ezb_token }}"
+              "value": "=Bearer {{ $env.EZB_TOKEN }}"
             },
             {
               "name": "X-Timezone-Name",
@@ -74,12 +74,12 @@
     },
     {
       "parameters": {
-        "functionCode": "// 筛出临期账单提醒候选；显式排除「贷款还款」分类（贷款不提醒，仅跟踪）\nconst loanCat = $vars.ezb_cat_loan;\nconst body = $input.item.json || {};\nconst result = (body && body.result) || body || {};\nconst txs = Array.isArray(result) ? result : (result.items || []);\nconst out = [];\nfor (const tx of txs) {\n  // 显式按分类排除贷款：ezB 交易携带 categoryId（嵌套 category.id 兜底）；贷款交易不进提醒\n  const catId = (tx.categoryId !== undefined) ? tx.categoryId : (tx.category && (tx.category.id !== undefined ? tx.category.id : undefined));\n  if (loanCat && String(catId) === String(loanCat)) continue;\n  const c = (tx.comment || '').toString();\n  if (/(待付|账单|缴费|续费)/.test(c)) {\n    out.push({ json: { txId: tx.id, comment: c, amount: tx.sourceAmount, categoryId: catId } });\n  }\n}\nreturn out;"
+        "jsCode": "// 筛出临期账单提醒候选；显式排除「贷款还款」分类（贷款不提醒，仅跟踪）\nconst loanCat = $env.EZB_CAT_LOAN;\nconst body = $input.item.json || {};\nconst result = (body && body.result) || body || {};\nconst txs = Array.isArray(result) ? result : (result.items || []);\nconst out = [];\nfor (const tx of txs) {\n  // 显式按分类排除贷款：ezB 交易携带 categoryId（嵌套 category.id 兜底）；贷款交易不进提醒\n  const catId = (tx.categoryId !== undefined) ? tx.categoryId : (tx.category && (tx.category.id !== undefined ? tx.category.id : undefined));\n  if (loanCat && String(catId) === String(loanCat)) continue;\n  const c = (tx.comment || '').toString();\n  if (/(待付|账单|缴费|续费)/.test(c)) {\n    out.push({ json: { txId: tx.id, comment: c, amount: tx.sourceAmount, categoryId: catId } });\n  }\n}\nreturn out;"
       },
       "id": "d4",
       "name": "Filter Due Bills",
-      "type": "n8n-nodes-base.function",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         710,
         300
@@ -87,12 +87,12 @@
     },
     {
       "parameters": {
-        "functionCode": "// 聚合所有临期账单为单封邮件；无则跳过（不发送）\nconst items = $input.all().map(i => i.json);\nif (items.length === 0) return [];\nconst esc = s => String(s == null ? '' : s).replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));\nconst rows = items.map(t => `<li>${esc(t.comment)} — ¥${t.amount}（分类 ${t.categoryId}）</li>`).join('');\nconst html = `<h3>TaskFIN 账单到期提醒</h3><p>你有 ${items.length} 笔账单临近到期/待付：</p><ul>${rows}</ul><p style=\"color:#888\">— 来自 ezBookkeeping 账单提醒工作流</p>`;\nreturn [{ json: { count: items.length, html } }];"
+        "jsCode": "// 聚合所有临期账单为单封邮件；无则跳过（不发送）\nconst items = $input.all().map(i => i.json);\nif (items.length === 0) return [];\nconst esc = s => String(s == null ? '' : s).replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));\nconst rows = items.map(t => `<li>${esc(t.comment)} — ¥${(t.amount/100).toFixed(2)}（分类 ${t.categoryId}）</li>`).join('');\nconst html = `<h3>TaskFIN 账单到期提醒</h3><p>你有 ${items.length} 笔账单临近到期/待付：</p><ul>${rows}</ul><p style=\"color:#888\">— 来自 ezBookkeeping 账单提醒工作流</p>`;\nreturn [{ json: { count: items.length, html } }];"
       },
       "id": "d5",
       "name": "Build Email Body",
-      "type": "n8n-nodes-base.function",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         940,
         220
@@ -100,8 +100,8 @@
     },
     {
       "parameters": {
-        "fromEmail": "={{ $vars.qq_email }}@{{ $vars.mail_domain }}",
-        "toEmail": "={{ $vars.qq_email }}@{{ $vars.mail_domain }}",
+        "fromEmail": "={{ $env.QQ_EMAIL }}@{{ $env.MAIL_DOMAIN }}",
+        "toEmail": "={{ $env.QQ_EMAIL }}@{{ $env.MAIL_DOMAIN }}",
         "subject": "📅 账单到期提醒（TaskFIN）",
         "emailFormat": "html",
         "html": "={{ $json.html }}",

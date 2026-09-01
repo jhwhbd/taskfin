@@ -31,13 +31,12 @@ if [ ! -f "$PROJECT_DIR/.env" ]; then
 fi
 echo "[1/6] .env 已存在，复用"
 
-# 载入 .env 以便后续取 PUID/PGID/TZ（仅导出已知键，避免污染）
-set -a
-# shellcheck disable=SC1091
-source "$PROJECT_DIR/.env"
-set +a
-PUID="${PUID:-1000}"
-PGID="${PGID:-1000}"
+# 载入 .env 中的 PUID/PGID/TZ（仅按需提取已知键，不整体 source .env，
+# 避免 .env 内特殊字符被当作 shell 执行，#8）
+_PICK() { grep -E "^${1}=" "$PROJECT_DIR/.env" 2>/dev/null | head -1 | cut -d= -f2- ; }
+PUID="$(_PICK PUID)"; PUID="${PUID:-1000}"
+PGID="$(_PICK PGID)"; PGID="${PGID:-1000}"
+TZ="$(_PICK TZ)"; TZ="${TZ:-Asia/Shanghai}"
 
 # ---------- 2. 数据目录 ----------
 echo "[2/6] 创建运行时数据目录 ..."
@@ -55,21 +54,21 @@ chown -R "$PUID:$PGID" \
     echo "  ⚠️ chown 失败（可能权限不足）；若在群晖请确认以有 sudo 权限用户运行。"
   }
 
-# ---------- 4. 构建品牌化镜像 ----------
-echo "[4/6] 从 vendor/ 源码构建 Vikunja / ezBookkeeping 镜像（首次较慢，请耐心）..."
+# ---------- 4. 部署前自检（前置，避免配置错误浪费构建/启动，#8）----------
+if [ -x "$SCRIPT_DIR/check-config.sh" ]; then
+  echo "[4/6] 运行部署前自检 ..."
+  bash "$SCRIPT_DIR/check-config.sh" || { echo "  ❌ 自检未通过，请先按上方提示修正后再部署。"; exit 1; }
+else
+  echo "[4/6] 跳过自检（未找到 check-config.sh）"
+fi
+
+# ---------- 5. 构建品牌化镜像 ----------
+echo "[5/6] 从 vendor/ 源码构建 Vikunja / ezBookkeeping 镜像（首次较慢，请耐心）..."
 docker compose build vikunja ezbookkeeping
 
-# ---------- 5. 拉起服务 ----------
-echo "[5/6] 启动全部服务 ..."
+# ---------- 6. 拉起服务 ----------
+echo "[6/6] 启动全部服务 ..."
 docker compose up -d
-
-# ---------- 6. 部署前自检 ----------
-if [ -x "$SCRIPT_DIR/check-config.sh" ]; then
-  echo "[6/6] 运行部署前自检 ..."
-  bash "$SCRIPT_DIR/check-config.sh" || echo "  （自检有告警，请按上方提示处理；不影响启动）"
-else
-  echo "[6/6] 跳过自检（未找到 check-config.sh）"
-fi
 
 # ---------- 7. 后续手动事项 ----------
 cat <<'EOF'

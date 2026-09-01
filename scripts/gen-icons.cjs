@@ -8,7 +8,7 @@
  *   3. png-to-ico 合成多尺寸 favicon.ico。
  *   4. 把产物铺到 vendored 的 Vikunja / ezBookkeeping 前端目录（对应「从源码构建」部署）。
  *
- * 字体：branding/fonts/OpenSans-SemiBold.ttf（Apache 2.0，已随仓库提供）。
+ * 字体：branding/fonts/OpenSans-SemiBold.ttf（SIL Open Font License 1.1，已随仓库提供；许可见 NOTICE 第 4 节）。
  * 颜色：紫色 #6C5CE7。
  *
  * 重新运行：node scripts/gen-icons.cjs

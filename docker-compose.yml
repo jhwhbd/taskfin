@@ -33,6 +33,19 @@ services:
     cap_add:
       - NET_BIND_SERVICE
     networks: [appnet]
+    # 健康检查：NPM 基于 alpine，用 wget --spider 探管理口 81（仅本机回环）。
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:81/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    # 日志轮转：避免容器日志无限增长撑满磁盘。
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # ---- 动态 DNS（仅内网 :9876 管理）----
   ddns-go:
@@ -51,6 +64,18 @@ services:
       - ALL
     pids_limit: 128
     networks: [appnet]
+    # 健康检查：ddns-go 基于 alpine，用 wget --spider 探管理口 9876（仅本机回环）。
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:9876/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # ---- 任务管理 Vikunja（不发布主机端口，仅 NPM 内网反代）----
   vikunja:
@@ -101,6 +126,12 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+    # 日志轮转：避免容器日志无限增长撑满磁盘。
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # ---- 财务管理 ezBookkeeping（不发布主机端口）----
   ezbookkeeping:
@@ -156,6 +187,12 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+    # 日志轮转：避免容器日志无限增长撑满磁盘。
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # ---- 自动化桥接 n8n（不发布主机端口）----
   # 启动顺序：下方 depends_on 已改为「等待上游 healthcheck 通过」（condition: service_healthy），
@@ -184,6 +221,19 @@ services:
       # Webhook 静态密钥（单源）：注入 n8n 容器环境变量，Auth Guard 直接读 $env.WEBHOOK_SECRET，
       # 不再依赖 n8n 内部变量（D 项）。改 .env 后重启 n8n 即生效，无需改工作流。
       WEBHOOK_SECRET: "${WEBHOOK_SECRET}"
+      # D1-A：桥接所需的 token / 分类 / 账户 ID 改为「容器环境变量单源」，由 compose 注入 n8n 容器，
+      # 工作流内用 $env.XXX 读取（不再依赖 n8n 内部 $vars，社区版不支持 Custom Variables）。
+      # 注意：n8n 默认禁止节点读取环境变量，需显式放开（仅放开读，不影响其它安全设置）。
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+      VIKUNJA_TOKEN: "${VIKUNJA_TOKEN}"
+      EZB_TOKEN: "${EZB_TOKEN}"
+      EZB_CAT_EXPENSE: "${EZB_CAT_EXPENSE}"
+      EZB_CAT_LOAN: "${EZB_CAT_LOAN}"
+      EZB_ACCOUNT_CASH_ID: "${EZB_ACCOUNT_CASH_ID}"
+      EZB_ACCOUNT_DEPOSIT_ID: "${EZB_ACCOUNT_DEPOSIT_ID}"
+      # 发件地址（与 Vikunja/ezB 共用 .env 的 QQ_EMAIL / MAIL_DOMAIN）
+      QQ_EMAIL: "${QQ_EMAIL}"
+      MAIL_DOMAIN: "${MAIL_DOMAIN}"
     restart: unless-stopped
     # 🟡21 容器加固
     security_opt:
@@ -199,6 +249,12 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+    # 日志轮转：避免容器日志无限增长撑满磁盘。
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 # ===== 首次启动（在仓库根目录执行）=====
 # cp .env.example .env   # 然后填好真实值（包含镜像版本）
